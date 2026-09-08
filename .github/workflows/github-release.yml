@@ -34,25 +34,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Android is the only target this fork ships. The per-OS steps below
+        # are left in place and stay inert via their `if:` guards, so another
+        # target is a one-entry addition here.
+        #
+        # windows-zip is additionally blocked: package:libavif's CMake
+        # TryCompile path exceeds Windows MAX_PATH (265 chars against a 260
+        # limit) and MSBuild's FileTracker ignores LongPathsEnabled.
         include:
           - target: apk
             os: ubuntu-latest
             artifact_name: boorusama-apk
-          - target: linux-tar.gz
-            os: ubuntu-latest
-            artifact_name: boorusama-linux-tar-gz
-          - target: appimage
-            os: ubuntu-latest
-            artifact_name: boorusama-appimage
-          - target: windows-zip
-            os: windows-latest
-            artifact_name: boorusama-windows-zip
-          - target: ipa
-            os: macos-latest
-            artifact_name: boorusama-ipa
-          - target: dmg
-            os: macos-latest
-            artifact_name: boorusama-dmg
 
     env:
       BOORUSAMA_USE_FVM: "false"
@@ -138,6 +130,24 @@ jobs:
           set -euo pipefail
           brew install create-dmg
           sudo gem install cocoapods
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
 
       - name: Initialize workspace
         shell: bash
