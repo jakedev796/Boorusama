@@ -209,6 +209,22 @@ so treat it as permanent.
 Note the first properly-signed release still cannot update a previously debug-signed install: that one
 upgrade needs an uninstall. Every upgrade after it is in place.
 
+**`storeFile` in `key.properties` must be an absolute path.** `build.gradle.kts` loads
+`key.properties` with `rootProject.file()`, which resolves against `android/`, but resolves
+`storeFile` with a bare `file()`, which resolves against the `:app` project dir — `android/app/`. A
+relative `storeFile` therefore misses, `hasValidKeystore` stays false, and the build **silently
+debug-signs**. 4.7.2 shipped that way: the keystore was valid and the signing step passed, and the APK
+was still `CN=Android Debug`.
+
+The lesson is that a valid keystore on disk proves nothing about what Gradle did with it. The
+`Verify APKs are release-signed` step therefore runs `apksigner verify --print-certs` on the built
+artifacts and fails on `Android Debug` — that is the only check that catches a silent fallback. When
+touching signing, verify the shipped APK, not the config:
+
+```bash
+apksigner verify --print-certs boorusama-*.apk | grep 'certificate DN'
+```
+
 ### Four places have to agree about targets
 
 Reducing or narrowing what gets built breaks the things that consume it. This caused three separate
