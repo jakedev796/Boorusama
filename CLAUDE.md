@@ -99,7 +99,7 @@ Run all of this on Linux/WSL2 — steps 2 and 3 cannot pass on Windows.
    feel obliged to fix the pre-existing ones.
 4. **Test** — there are **two layers**, and the second is easy to miss entirely.
 
-   a. `flutter test` at the repo root — expect **652 passed / 1 failed of 653** (see Known failing
+   a. `flutter test` at the repo root — expect **659 passed / 1 failed of 660** (see Known failing
       test). This runs only the root `test/` tree.
 
    b. Root `flutter test` does **not** run any workspace package's own suite. Ten packages have one,
@@ -172,6 +172,42 @@ Only the **repository owner** can run it — both jobs are gated
 Logs are only downloadable per-job while a run is in progress
 (`gh api repos/<owner>/<repo>/actions/jobs/<id>/logs --allow-escape-sequences`); `gh run view --log`
 refuses until the whole run finishes.
+
+### Release signing is required, and the key must never change
+
+`android/app/build.gradle.kts:63` picks the release signing config only when `android/key.properties`
+exists and its `storeFile` resolves; otherwise it **silently falls back to the debug config**. CI
+runners generate their own throwaway debug keystore, so before this was fixed every release was signed
+with a *different* key — meaning no APK could update another in place. Users got a bare
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE` and had to uninstall, losing all their data, on every upgrade.
+
+The `Set up Android signing key` step now materialises the keystore from secrets and **fails the build**
+if they are absent, so a debug-signed APK can never be published again. Four repo secrets are required:
+
+| Secret | Contents |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the `.jks` file, base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password |
+| `ANDROID_KEY_ALIAS` | key alias |
+| `ANDROID_KEY_PASSWORD` | key password |
+
+One-time setup:
+
+```bash
+keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+gh secret set ANDROID_KEYSTORE_BASE64 < <(base64 -w0 release.jks)
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS --body upload
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+**Back the `.jks` up somewhere permanent and never commit it** (`android/.gitignore` already blocks
+`*.jks` and `key.properties`). Losing it means no future build can ever update an installed app again —
+every user would have to uninstall and reinstall one final time. Changing the key has the same effect,
+so treat it as permanent.
+
+Note the first properly-signed release still cannot update a previously debug-signed install: that one
+upgrade needs an uninstall. Every upgrade after it is in place.
 
 ### Four places have to agree about targets
 

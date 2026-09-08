@@ -155,6 +155,53 @@ jobs:
           set -euo pipefail
           ./init.sh
 
+      # Without this, android/app/build.gradle.kts falls back to the DEBUG
+      # signing config, and every runner generates its own throwaway debug
+      # keystore. Each release would then be signed with a different key, so no
+      # APK could ever update another in place -- users would have to uninstall
+      # and lose their data on every upgrade. Fail loudly rather than publish
+      # an un-updatable build.
+      - name: Set up Android signing key
+        if: matrix.target == 'apk'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [[ -n "$KEYSTORE_BASE64" ]]   || missing+=(ANDROID_KEYSTORE_BASE64)
+          [[ -n "$KEYSTORE_PASSWORD" ]] || missing+=(ANDROID_KEYSTORE_PASSWORD)
+          [[ -n "$KEY_ALIAS" ]]         || missing+=(ANDROID_KEY_ALIAS)
+          [[ -n "$KEY_PASSWORD" ]]      || missing+=(ANDROID_KEY_PASSWORD)
+
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing release signing secret(s): ${missing[*]}."
+            echo "::error::Refusing to build an APK that would be debug-signed."
+            echo "::error::See 'Cutting a release' in CLAUDE.md for the setup steps."
+            exit 1
+          fi
+
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/release.jks
+
+          # Gradle reads android/key.properties; storeFile is resolved relative
+          # to the android/ directory, which is Gradle's rootProject dir.
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+          # Confirm Gradle will actually take the release path, so a silent
+          # fallback to debug signing can never reach a published release.
+          keytool -list -keystore android/release.jks \
+            -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
+          echo "Release keystore is in place and the alias resolves."
+
       - name: Build GitHub release artifact
         shell: bash
         run: |
