@@ -12,6 +12,7 @@ import '../../../core/posts/post/types.dart';
 import '../client_provider.dart';
 import '../posts/parser.dart';
 import '../posts/types.dart';
+import 'feed.dart';
 
 /// Pixiv's ranking is offset-paged at 30 items/page (see `PixivClient`,
 /// which computes the offset itself from the `page` it is given). Kept
@@ -25,9 +26,10 @@ final kPixivRankingEarliestDate = DateTime.utc(2007, 9, 13);
 
 /// Maps the shared [TimeScale] control onto pixiv's ranking modes.
 ///
-/// Only day/week/month are exposed. The API also has `*_male`, `*_female`,
-/// `*_rookie`, `*_ai` and R18 variants, but those are out of scope — R18
-/// content is better served by the app's own rating filter.
+/// This only covers the day/week/month scale toggle offered within the
+/// Ranking feed. The other ranking modes (male/female/rookie/ai/manga/R-18
+/// variants) are reached through the mode selector instead, which carries a
+/// [PixivRankingMode] directly rather than going through [TimeScale].
 PixivRankingMode pixivRankingModeFrom(TimeScale scale) => switch (scale) {
   TimeScale.day => PixivRankingMode.day,
   TimeScale.week => PixivRankingMode.week,
@@ -93,49 +95,77 @@ DateTime? pixivRankingRequestDateFor(DateTime date, {DateTime? now}) =>
     ? null
     : clampPixivRankingDate(date, now: now);
 
-final pixivRankingRepoProvider =
-    Provider.family<PixivRankingRepository, BooruConfigAuth>((ref, config) {
+/// Whether to show the "R-18 hidden" warning for [feed] given the account's
+/// stored `x_restrict` level.
+///
+/// Deliberately different from pxview, which silently omits modes the
+/// account cannot currently see: a wrong reading of the flag must not lock
+/// anyone out of content they are entitled to, so this warns rather than
+/// gates — the request is still made either way. A `null` account level
+/// (never captured, or a malformed `passHash`) never warns: there is no
+/// evidence the account can't see the mode, only an absence of evidence.
+bool pixivShouldWarnXRestrict(PixivExploreFeed feed, int? accountXRestrict) {
+  if (accountXRestrict == null) return false;
+
+  return switch (feed) {
+    PixivRankingFeed(:final mode) => mode.minimumXRestrict > accountXRestrict,
+    PixivFollowingFeed() || PixivRecommendedFeed() => false,
+  };
+}
+
+final pixivExploreRepoProvider =
+    Provider.family<PixivExploreRepository, BooruConfigAuth>((ref, config) {
       final client = ref.watch(pixivClientProvider(config));
 
-      return PixivRankingRepository(client: client);
+      return PixivExploreRepository(client: client);
     });
 
-class PixivRankingRepository {
-  PixivRankingRepository({required this.client});
+class PixivExploreRepository {
+  PixivExploreRepository({required this.client});
 
   final PixivClient client;
 
-  /// The page beyond which the ranking is known to have run out, per the
+  /// The page beyond which a given feed is known to have run out, per the
   /// API's own `next_url` signal (see `PixivIllustListResult.hasMore`) —
   /// set once a page's response omits it, so later pages short-circuit
-  /// instead of firing a request past the end of the ranking (roughly page
-  /// 17 for a day ranking of ~500 items).
-  int? _exhaustedAfterPage;
+  /// instead of firing a request past the end of the feed. Keyed per feed
+  /// (see [_cacheKeyFor]) so switching feeds — or the ranking mode/date
+  /// within one — doesn't inherit another feed's exhaustion point.
+  final Map<String, int> _exhaustedAfterPage = {};
 
-  PostsOrError<PixivPost> getRanking({
-    required TimeScale scale,
-    required DateTime date,
+  PostsOrError<PixivPost> getPosts({
+    required PixivExploreFeed feed,
     required int page,
     DateTime? now,
   }) {
-    final exhaustedAfter = _exhaustedAfterPage;
+    final key = _cacheKeyFor(feed);
+    final exhaustedAfter = _exhaustedAfterPage[key];
     if (exhaustedAfter != null && page > exhaustedAfter) {
       return TaskEither.of(const <PixivPost>[].toResult());
     }
 
-    final mode = pixivRankingModeFrom(scale);
-    final requestDate = pixivRankingRequestDateFor(date, now: now);
-
     return TaskEither.tryCatch(
       () async {
-        final result = await client.getRanking(
-          mode: mode,
-          date: requestDate,
-          page: page,
-        );
+        final result = await switch (feed) {
+          PixivRankingFeed(:final mode, :final date) => client.getRanking(
+            mode: mode,
+            date: pixivRankingRequestDateFor(date, now: now),
+            page: page,
+          ),
+          PixivFollowingFeed(:final restrict) => client.getFollowedIllusts(
+            restrict: restrict,
+            page: page,
+          ),
+          PixivRecommendedFeed() => client.getRecommendedIllusts(page: page),
+        };
 
+        // GOTCHA: pixiv returns stub illusts for some flagged works
+        // (`visible: false`) even to R-18-enabled accounts, and the parser
+        // drops them — so a 30-item API page routinely yields fewer than 30
+        // posts. `hasMore` must come from `next_url` only (which
+        // `PixivIllustListResult` already does), never from a short page.
         if (!result.hasMore) {
-          _exhaustedAfterPage = page;
+          _exhaustedAfterPage[key] = page;
         }
 
         return illustDtosToPosts(result.illusts).toResult();
@@ -143,6 +173,13 @@ class PixivRankingRepository {
       _mapError,
     );
   }
+
+  static String _cacheKeyFor(PixivExploreFeed feed) => switch (feed) {
+    PixivRankingFeed(:final mode, :final date) =>
+      'ranking:${mode.value}:${date.toIso8601String()}',
+    PixivFollowingFeed(:final restrict) => 'following:${restrict.value}',
+    PixivRecommendedFeed() => 'recommended',
+  };
 
   /// Mirrors `tryFetchRemoteData`'s (core/http/client) `DioException`
   /// mapping, with one addition at the top: the shared rate limiter (see

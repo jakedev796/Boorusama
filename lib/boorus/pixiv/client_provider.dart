@@ -199,6 +199,7 @@ Future<void> persistPixivRotatedToken({
     userId: user?.id ?? stored.userId,
     userName: user?.name ?? stored.userName,
     isPremium: user?.isPremium ?? stored.isPremium,
+    xRestrict: user?.xRestrict ?? stored.xRestrict,
     tokenExpiry: expiresIn == null
         ? stored.tokenExpiry
         : (now ?? DateTime.now()).add(Duration(seconds: expiresIn)),
