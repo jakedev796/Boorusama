@@ -1,3 +1,11 @@
+# 4.7.2
+- [Pixiv] Fix downloads failing, and every file being saved under the same name
+- [Pixiv] Use a higher-quality image when viewing a post
+- [Pixiv] Add Ranking to the navigation menu
+- [Pawchive] Add Creators to the navigation menu
+- Release builds are now signed with a persistent key, so future updates install in place
+  (upgrading to this build still needs one reinstall)
+
 # 4.7.1
 - [Pixiv] Fix Pixiv not being recognized when adding it as a source
 
