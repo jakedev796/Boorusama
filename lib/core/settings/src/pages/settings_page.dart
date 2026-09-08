@@ -20,9 +20,6 @@ import '../../../changelogs/routes.dart';
 import '../../../configs/config/providers.dart';
 import '../../../configs/create/routes.dart';
 import '../../../debug/routes.dart';
-import '../../../premiums/providers.dart';
-import '../../../premiums/routes.dart';
-import '../../../premiums/types.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/settings_page_scaffold.dart';
 import 'about_page.dart';
@@ -437,46 +434,6 @@ class SettingsPageOtherSection extends ConsumerWidget {
         _SettingsSection(
           label: context.t.settings.other_settings,
         ),
-        if (ref.watch(hasPremiumProvider))
-          ref
-              .watch(premiumManagementURLProvider)
-              .maybeWhen(
-                data: (url) => SettingTile(
-                  title: 'Manage Subscription',
-                  leading: const FaIcon(
-                    FontAwesomeIcons.solidStar,
-                  ),
-                  onTap: () => url != null
-                      ? launchExternalUrl(
-                          Uri.parse(url),
-                          mode: LaunchMode.externalApplication,
-                        )
-                      : Kurumi.showErrorToast(
-                          context,
-                          'Failed to open subscription management',
-                        ),
-                ),
-                orElse: () => SettingTile(
-                  title: 'Manage Subscription',
-                  leading: const FaIcon(
-                    FontAwesomeIcons.solidStar,
-                  ),
-                  onTap: () {
-                    Kurumi.showErrorToast(
-                      context,
-                      'Failed to open subscription management',
-                    );
-                  },
-                ),
-              )
-        else if (ref.watch(showPremiumFeatsProvider) && !kForcePremium)
-          SettingTile(
-            title: kPremiumBrandNameFull,
-            leading: const FaIcon(
-              FontAwesomeIcons.solidStar,
-            ),
-            onTap: () => goToPremiumPage(ref),
-          ),
         SettingTile(
           title: context.t.settings.changelog,
           leading: const FaIcon(
