@@ -3,18 +3,17 @@ import '../../core/boorus/defaults/widgets.dart';
 import '../../core/boorus/engine/types.dart';
 import '../../core/configs/config/types.dart';
 import '../../core/configs/create/widgets.dart';
+import '../../core/configs/manage/widgets.dart';
 import '../../core/home/types.dart';
 import '../../core/posts/details/widgets.dart';
 import '../../core/posts/details_parts/types.dart';
 import '../../core/posts/details_parts/widgets.dart';
+import 'configs/widgets.dart';
 import 'posts/types.dart';
 
 class PixivBuilder extends BaseBooruBuilder {
   PixivBuilder();
 
-  /// A plain, unauthenticated config page for now — Pixiv has no anonymous
-  /// mode, so this is a placeholder seam. S3 replaces it with the OAuth
-  /// login / refresh-token-paste tab.
   @override
   CreateConfigPageBuilder get createConfigPageBuilder =>
       (
@@ -28,8 +27,27 @@ class PixivBuilder extends BaseBooruBuilder {
           url: id.url,
           customDownloadFileNameFormat: null,
         ),
-        child: CreateAnonConfigPage(
+        child: CreatePixivConfigPage(
           backgroundColor: backgroundColor,
+        ),
+      );
+
+  /// Without this the default update page would be the anonymous one, which
+  /// has no auth tab — leaving no way to re-login and making the session
+  /// expired dialog's `?q=auth` deep link land on a page that cannot honour
+  /// it.
+  @override
+  UpdateConfigPageBuilder get updateConfigPageBuilder =>
+      (
+        context,
+        id, {
+        backgroundColor,
+        initialTab,
+      }) => UpdateBooruConfigScope(
+        id: id,
+        child: CreatePixivConfigPage(
+          backgroundColor: backgroundColor,
+          initialTab: initialTab,
         ),
       );
 
