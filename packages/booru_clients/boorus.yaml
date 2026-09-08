@@ -271,3 +271,12 @@
     protocol: https_2
     sites:
       - https://nozomi.la/
+
+- pawchive:
+    metadata:
+      id: 36
+      display-name: Pawchive
+      single-site: true
+    protocol: https_2
+    sites:
+      - https://pawchive.pw/
