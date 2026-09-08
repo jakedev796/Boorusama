@@ -39,9 +39,16 @@ class _PixivExplorePageState extends ConsumerState<PixivExplorePage> {
     ),
   );
 
+  // The floating header's content (feed selector, warning banner, mode
+  // picker) changes height depending on the feed and account state, so its
+  // `SliverAppBar.bottom` height is measured rather than hardcoded — see
+  // `_PixivExploreSliverAppBar`.
+  final _headerHeight = ValueNotifier<double>(0);
+
   @override
   void dispose() {
     _feed.dispose();
+    _headerHeight.dispose();
     super.dispose();
   }
 
@@ -53,9 +60,6 @@ class _PixivExplorePageState extends ConsumerState<PixivExplorePage> {
     ).xRestrict;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.t.pixiv.explore.title),
-      ),
       body: PostScope<PixivPost>(
         fetcher: (page) => ref
             .read(pixivExploreRepoProvider(config))
@@ -63,77 +67,170 @@ class _PixivExplorePageState extends ConsumerState<PixivExplorePage> {
               feed: _feed.value,
               page: page,
             ),
-        // `top: false` because the AppBar already covers the status bar, and
-        // `safeArea: false` on the grid so the grid itself still paints to
-        // the edges. Without this, controls pinned below the grid render
-        // underneath Android's system navigation bar in edge-to-edge mode.
-        // Mirrors Danbooru's explore page.
+        // `top: false` because the SliverAppBar in `sliverHeaders` already
+        // covers the status bar itself, and `safeArea: false` on the grid
+        // so the grid itself still paints to the edges. Without this,
+        // controls pinned below the grid render underneath Android's
+        // system navigation bar in edge-to-edge mode. Mirrors Danbooru's
+        // explore page.
         builder: (context, controller) => SafeArea(
           top: false,
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                child: _FeedSelector(
-                  feed: _feed,
-                  onChanged: (kind) {
-                    _feed.value = pixivDefaultFeedFor(
-                      kind,
-                      current: _feed.value,
-                      newestRankingDate: pixivRankingNewestDate(),
-                    );
-                    controller.refresh();
-                  },
-                ),
-              ),
-              ValueListenableBuilder(
-                valueListenable: _feed,
-                builder: (context, feed, _) {
-                  final warn = pixivShouldWarnXRestrict(
-                    feed,
-                    accountXRestrict,
-                  );
-
-                  return Column(
-                    children: [
-                      if (warn)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                          child: KurumiWarningContainer(
-                            title: context.t.generic.warning,
-                            contentBuilder: (context) => Text(
-                              context.t.pixiv.explore.x_restrict_warning,
-                            ),
-                          ),
-                        ),
-                      switch (feed) {
-                        PixivRankingFeed() => _RankingControls(
-                          feed: _feed,
-                          onChanged: () => controller.refresh(),
-                        ),
-                        PixivFollowingFeed() => _FollowingControls(
-                          feed: _feed,
-                          onChanged: () => controller.refresh(),
-                        ),
-                        PixivRecommendedFeed() => const SizedBox.shrink(),
-                      },
-                    ],
-                  );
-                },
-              ),
               Expanded(
                 child: PostGrid(
                   controller: controller,
                   safeArea: false,
+                  sliverHeaders: [
+                    _PixivExploreSliverAppBar(
+                      feed: _feed,
+                      headerHeight: _headerHeight,
+                      accountXRestrict: accountXRestrict,
+                      onFeedKindChanged: (kind) {
+                        _feed.value = pixivDefaultFeedFor(
+                          kind,
+                          current: _feed.value,
+                          newestRankingDate: pixivRankingNewestDate(),
+                        );
+                        controller.refresh();
+                      },
+                      onControlsChanged: () => controller.refresh(),
+                    ),
+                  ],
                 ),
+              ),
+              // The date stepper is meaningless outside Ranking and stays
+              // pinned at the bottom, outside the scrolling grid — it does
+              // not float away with the header.
+              ValueListenableBuilder(
+                valueListenable: _feed,
+                builder: (context, feed, _) => switch (feed) {
+                  PixivRankingFeed() => _RankingDateStepper(
+                    feed: _feed,
+                    onChanged: () => controller.refresh(),
+                  ),
+                  PixivFollowingFeed() ||
+                  PixivRecommendedFeed() => const SizedBox.shrink(),
+                },
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The Explore page's floating header: title, feed selector, X-restrict
+/// warning and the Ranking-only mode picker, all attached via
+/// `SliverAppBar.bottom` so they float away and back together with the
+/// title on scroll.
+///
+/// The bottom content's height varies — the mode picker is absent for
+/// Following/Recommended, and the warning banner only shows sometimes — so
+/// rather than hardcoding a height, [KurumiMeasureSize] measures the
+/// actual rendered content and feeds it back into [headerHeight], which
+/// then sizes `SliverAppBar.bottom`'s `PreferredSize`.
+class _PixivExploreSliverAppBar extends StatelessWidget {
+  const _PixivExploreSliverAppBar({
+    required this.feed,
+    required this.headerHeight,
+    required this.accountXRestrict,
+    required this.onFeedKindChanged,
+    required this.onControlsChanged,
+  });
+
+  final ValueNotifier<PixivExploreFeed> feed;
+  final ValueNotifier<double> headerHeight;
+  final int? accountXRestrict;
+  final ValueChanged<PixivExploreFeedKind> onFeedKindChanged;
+  final VoidCallback onControlsChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<double>(
+      valueListenable: headerHeight,
+      builder: (context, height, _) => SliverAppBar(
+        title: Text(context.t.pixiv.explore.title),
+        floating: true,
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(height),
+          child: KurumiMeasureSize(
+            onChange: (size) {
+              if (size.height != headerHeight.value) {
+                headerHeight.value = size.height;
+              }
+            },
+            child: _HeaderControls(
+              feed: feed,
+              accountXRestrict: accountXRestrict,
+              onFeedKindChanged: onFeedKindChanged,
+              onControlsChanged: onControlsChanged,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderControls extends StatelessWidget {
+  const _HeaderControls({
+    required this.feed,
+    required this.accountXRestrict,
+    required this.onFeedKindChanged,
+    required this.onControlsChanged,
+  });
+
+  final ValueNotifier<PixivExploreFeed> feed;
+  final int? accountXRestrict;
+  final ValueChanged<PixivExploreFeedKind> onFeedKindChanged;
+  final VoidCallback onControlsChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: feed,
+      builder: (context, value, _) {
+        final warn = pixivShouldWarnXRestrict(value, accountXRestrict);
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              child: _FeedSelector(
+                feed: feed,
+                onChanged: onFeedKindChanged,
+              ),
+            ),
+            if (warn)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: KurumiWarningContainer(
+                  title: context.t.generic.warning,
+                  contentBuilder: (context) => Text(
+                    context.t.pixiv.explore.x_restrict_warning,
+                  ),
+                ),
+              ),
+            switch (value) {
+              PixivRankingFeed() => _RankingModePicker(
+                feed: feed,
+                onChanged: onControlsChanged,
+              ),
+              PixivFollowingFeed() => _FollowingControls(
+                feed: feed,
+                onChanged: onControlsChanged,
+              ),
+              PixivRecommendedFeed() => const SizedBox.shrink(),
+            },
+          ],
+        );
+      },
     );
   }
 }
@@ -170,11 +267,12 @@ class _FeedSelector extends StatelessWidget {
   }
 }
 
-/// The mode dropdown and date stepper — meaningless outside the Ranking
-/// feed, so this widget only ever appears while [feed] holds a
-/// [PixivRankingFeed].
-class _RankingControls extends StatelessWidget {
-  const _RankingControls({
+/// The mode dropdown — meaningless outside the Ranking feed, so this
+/// widget only ever appears while [feed] holds a [PixivRankingFeed]. Floats
+/// in the header alongside the feed selector; the date stepper for this
+/// same feed is rendered separately, pinned at the bottom of the page.
+class _RankingModePicker extends StatelessWidget {
+  const _RankingModePicker({
     required this.feed,
     required this.onChanged,
   });
@@ -189,39 +287,62 @@ class _RankingControls extends StatelessWidget {
       builder: (context, value, _) {
         final ranking = value as PixivRankingFeed;
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: KurumiOptionDropDownButton<PixivRankingMode>(
-                value: ranking.mode,
-                alignment: AlignmentDirectional.centerStart,
-                onChanged: (mode) {
-                  if (mode == null) return;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: KurumiOptionDropDownButton<PixivRankingMode>(
+            value: ranking.mode,
+            alignment: AlignmentDirectional.centerStart,
+            onChanged: (mode) {
+              if (mode == null) return;
 
-                  feed.value = ranking.copyWith(mode: mode);
-                  onChanged();
-                },
-                items: [
-                  for (final mode in PixivRankingMode.values)
-                    DropdownMenuItem(
-                      value: mode,
-                      child: Text(pixivRankingModeLabel(context, mode)),
-                    ),
-                ],
-              ),
-            ),
-            DateTimeSelector(
-              date: ranking.date,
-              scale: _timeScaleOf(ranking.mode),
-              backgroundColor: Colors.transparent,
-              onDateChanged: (newDate) {
-                final clamped = clampPixivRankingDate(newDate);
-                feed.value = ranking.copyWith(date: clamped);
-                onChanged();
-              },
-            ),
-          ],
+              feed.value = ranking.copyWith(mode: mode);
+              onChanged();
+            },
+            items: [
+              for (final mode in PixivRankingMode.values)
+                DropdownMenuItem(
+                  value: mode,
+                  child: Text(pixivRankingModeLabel(context, mode)),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The date stepper for the Ranking feed, pinned at the bottom of the
+/// page, outside the scrolling grid — unlike the rest of the Explore
+/// controls, it does not float away with the header.
+class _RankingDateStepper extends StatelessWidget {
+  const _RankingDateStepper({
+    required this.feed,
+    required this.onChanged,
+  });
+
+  final ValueNotifier<PixivExploreFeed> feed;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: feed,
+      builder: (context, value, _) {
+        final ranking = value as PixivRankingFeed;
+        final newestDate = pixivRankingNewestDate();
+
+        return DateTimeSelector(
+          date: ranking.date,
+          scale: _timeScaleOf(ranking.mode),
+          backgroundColor: Colors.transparent,
+          firstDate: kPixivRankingEarliestDate,
+          lastDate: newestDate,
+          onDateChanged: (newDate) {
+            final clamped = clampPixivRankingDate(newDate);
+            feed.value = ranking.copyWith(date: clamped);
+            onChanged();
+          },
         );
       },
     );

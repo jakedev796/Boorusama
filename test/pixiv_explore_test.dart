@@ -13,6 +13,7 @@ import 'package:boorusama/boorus/pixiv/configs/extra_data.dart';
 import 'package:boorusama/boorus/pixiv/explore/feed.dart';
 import 'package:boorusama/boorus/pixiv/explore/providers.dart';
 import 'package:boorusama/core/posts/explores/types.dart';
+import 'package:boorusama/core/posts/explores/widgets.dart';
 
 void main() {
   group('JST-yesterday computation', () {
@@ -157,6 +158,59 @@ void main() {
 
       expect(result, isNotNull);
       expect(DateFormat('yyyy-MM-dd').format(result!), '2020-06-01');
+    });
+  });
+
+  group("the Explore page's selectable ranking date range", () {
+    // Pixiv's Explore page passes `kPixivRankingEarliestDate` and
+    // `pixivRankingNewestDate()` as the date picker's `firstDate`/
+    // `lastDate` (see `_RankingDateStepper` in
+    // lib/boorus/pixiv/explore/widgets.dart) rather than the shared
+    // `DateTimeSelector`'s own defaults, so today must fall outside that
+    // window and its forward arrow must refuse to reach it.
+    final now = DateTime.utc(2024, 3, 10, 12); // JST-yesterday: 2024-03-09
+    final today = DateTime.utc(2024, 3, 10);
+
+    test("starts at pixiv's launch date", () {
+      expect(kPixivRankingEarliestDate, DateTime.utc(2007, 9, 13));
+    });
+
+    test('ends at JST-yesterday, one day short of today', () {
+      final lastDate = pixivRankingNewestDate(now: now);
+
+      expect(lastDate, DateTime.utc(2024, 3, 9));
+      expect(pixivJstToday(now: now), today);
+      expect(lastDate.isBefore(today), true);
+    });
+
+    test('cannot be stepped forward from the newest snapshot to today', () {
+      final lastDate = pixivRankingNewestDate(now: now);
+
+      expect(
+        canStepDateTime(
+          date: lastDate,
+          scale: TimeScale.day,
+          forward: true,
+          firstDate: kPixivRankingEarliestDate,
+          lastDate: lastDate,
+        ),
+        false,
+      );
+    });
+
+    test('can still be stepped backward from the newest snapshot', () {
+      final lastDate = pixivRankingNewestDate(now: now);
+
+      expect(
+        canStepDateTime(
+          date: lastDate,
+          scale: TimeScale.day,
+          forward: false,
+          firstDate: kPixivRankingEarliestDate,
+          lastDate: lastDate,
+        ),
+        true,
+      );
     });
   });
 
