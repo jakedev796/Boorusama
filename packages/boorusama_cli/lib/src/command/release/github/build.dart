@@ -207,15 +207,11 @@ final class ReleaseGithubBuildCommand extends Command<int> {
 
   List<String> _extraFlutterArgsFor(GithubReleaseTarget target) {
     return switch (target) {
-      // arm64 only. Building all three ABIs tripled the Dart AOT and native
-      // library work and was ~97% of a 16-minute release job; armeabi-v7a is
-      // 32-bit legacy and x86_64 is emulator-only. Drop the target-platform
-      // pair to go back to a full split.
-      GithubReleaseTarget.apk => const [
-        '--split-per-abi',
-        '--target-platform',
-        'android-arm64',
-      ],
+      // All three ABIs. Narrowing to arm64 was measured at 784s of Gradle
+      // versus 762s for the full split, so ABI count is not what costs time
+      // here — restoring the Gradle cache is (784s -> 310s). Keeping armeabi-v7a
+      // and x86_64 preserves 32-bit devices and emulators for free.
+      GithubReleaseTarget.apk => const ['--split-per-abi'],
       _ => const [],
     };
   }
