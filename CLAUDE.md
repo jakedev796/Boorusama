@@ -97,9 +97,33 @@ Run all of this on Linux/WSL2 — steps 2 and 3 cannot pass on Windows.
    (deprecated `prefer_final_parameters` lint, some `unawaited_return_in_try_block`, and
    `prefer_initializing_formals` in the vendored `packages/extended_image`). Do not add errors; do not
    feel obliged to fix the pre-existing ones.
-4. **Test** — `flutter test`. Expect **563 passed / 1 failed of 564** (see Known failing test).
-   If you touched `packages/boorusama_cli`, also run its own suite, which `flutter test` does not
-   cover: `cd packages/boorusama_cli && dart test` — expect **81 passed**.
+4. **Test** — there are **two layers**, and the second is easy to miss entirely.
+
+   a. `flutter test` at the repo root — expect **645 passed / 1 failed of 646** (see Known failing
+      test). This runs only the root `test/` tree.
+
+   b. Root `flutter test` does **not** run any workspace package's own suite. Ten packages have one,
+      ~553 tests between them, and none of it is covered by (a) — a package only reaches the root run
+      through app-level tests that import it (e.g. `test/pawchive_test.dart` imports
+      `package:booru_clients/pawchive.dart`). Run the suite for any package you touched:
+
+      | Package | Command | Expect |
+      |---|---|---|
+      | `coreutils` | `dart test` | 190 |
+      | `boorusama_cli` | `dart test` | 81 |
+      | `dtext` | `dart test` | 59 |
+      | `booru_clients` | `dart test` | 52 |
+      | `flutter_sqlite3_migration` | `flutter test` | 45 |
+      | `foundation` | `flutter test` | 45 |
+      | `i18n_cli` | `dart test` | 32 |
+      | `filename_generator` | `dart test` | 31 |
+      | `retriable` | `dart test` | 11 |
+      | `extended_image` | `flutter test` | 7 |
+
+      The three `flutter test` ones depend on Flutter; the rest are pure Dart. Writing an acceptance
+      check as "run `flutter test`" for work inside one of these packages is **vacuous** — the tests
+      never execute.
+
    If anything else fails, re-run it against `master` before assuming you caused it — several failures
    here have been pre-existing.
 
