@@ -1,3 +1,7 @@
+# 4.6.0
+- All Plus features are now available in every installation
+- Add support for Pawchive
+
 # 4.5.0
 - Add support for Nozomi
 - [Sankaku] Add favorite support
