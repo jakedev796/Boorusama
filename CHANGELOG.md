@@ -1,3 +1,9 @@
+# 4.7.0
+- Add support for Pixiv
+- [Pixiv] Log in with your own Pixiv account
+- [Pixiv] Browse the daily, weekly and monthly popularity rankings, and step back through past dates
+- [Pixiv] Multi-page works show every page, and can be downloaded
+
 # 4.6.0
 - All Plus features are now available in every installation
 - Add support for Pawchive
