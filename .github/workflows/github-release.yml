@@ -224,6 +224,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          # --target must list exactly the targets built by the matrix
+          # above. Left unset, the CLI requires a receipt for all six and
+          # fails the publish for every target the matrix no longer builds.
           args=(
             release
             github
@@ -233,6 +236,8 @@ jobs:
             "${{ github.repository }}"
             --artifacts-dir
             release-assets
+            --target
+            apk
           )
 
           args+=(--tag "${{ inputs.release_tag }}")
