@@ -99,10 +99,9 @@ PixivPost _toPost({
     sample: false,
     original: original,
   );
-  final sampleUrl = _thumbnailFor(
+  final sampleUrl = _sampleFor(
     dto,
     pageIndex,
-    sample: true,
     original: original,
   );
   final format = extensionOf(original);
@@ -149,8 +148,7 @@ PixivPost _toPost({
   );
 }
 
-/// Resolves the thumbnail (`sample: false`, `square_medium`) or sample
-/// (`sample: true`, `medium`) URL for one page.
+/// Resolves the thumbnail (`square_medium`) URL for one page.
 ///
 /// Page 0 reads the illust's own `image_urls`. Later pages read their own
 /// `meta_pages` entry — Pixiv does not always populate per-page thumbnails
@@ -173,6 +171,31 @@ String _thumbnailFor(
   final fromPage = sample
       ? page?.imageUrls?.medium
       : page?.imageUrls?.squareMedium;
+
+  return fromPage ?? original;
+}
+
+/// Resolves the sample (details view) URL for one page, preferring the
+/// `large` variant (1200px long side, q90) over `medium` (540px box, q70) —
+/// `medium` is sized for grid thumbnails and looks artefacted full-screen.
+///
+/// Page 0 reads the illust's own `image_urls`. Later pages read their own
+/// `meta_pages` entry, falling back to the original image when neither
+/// `large` nor `medium` is available.
+String _sampleFor(
+  PixivIllustDto dto,
+  int pageIndex, {
+  required String original,
+}) {
+  if (pageIndex == 0) {
+    final top = dto.imageUrls?.large ?? dto.imageUrls?.medium;
+    if (top != null) return top;
+  }
+
+  final page = pageIndex < dto.metaPages.length
+      ? dto.metaPages[pageIndex]
+      : null;
+  final fromPage = page?.imageUrls?.large ?? page?.imageUrls?.medium;
 
   return fromPage ?? original;
 }
