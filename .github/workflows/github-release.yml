@@ -185,22 +185,25 @@ jobs:
             exit 1
           fi
 
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/release.jks
+          keystore_path="$PWD/android/release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore_path"
 
-          # Gradle reads android/key.properties; storeFile is resolved relative
-          # to the android/ directory, which is Gradle's rootProject dir.
+          # storeFile MUST be absolute. android/app/build.gradle.kts loads
+          # key.properties with rootProject.file() (-> android/) but resolves
+          # storeFile with a bare file(), which is relative to the :app project
+          # dir (-> android/app/). A relative path therefore misses, silently
+          # leaves hasValidKeystore false, and falls back to DEBUG signing.
+          # That shipped in 4.7.2.
           cat > android/key.properties <<EOF
-          storeFile=release.jks
+          storeFile=$keystore_path
           storePassword=$KEYSTORE_PASSWORD
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
           EOF
 
-          # Confirm Gradle will actually take the release path, so a silent
-          # fallback to debug signing can never reach a published release.
-          keytool -list -keystore android/release.jks \
+          keytool -list -keystore "$keystore_path" \
             -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
-          echo "Release keystore is in place and the alias resolves."
+          echo "Release keystore in place at $keystore_path; alias resolves."
 
       - name: Build GitHub release artifact
         shell: bash
@@ -223,6 +226,46 @@ jobs:
           fi
 
           ./build.sh "${args[@]}"
+
+      # A valid keystore on disk is NOT proof Gradle used it — 4.7.2 passed the
+      # keystore check and still shipped debug-signed because storeFile was
+      # relative. Assert the signer on the actual artifact, which is the only
+      # check that can catch a silent fallback.
+      - name: Verify APKs are release-signed
+        if: matrix.target == 'apk'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          apksigner=$(ls "$sdk"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          if [[ -z "$apksigner" ]]; then
+            echo "::error::apksigner not found under ${sdk:-<unset>}/build-tools"
+            exit 1
+          fi
+
+          mapfile -t apks < <(find "$OUTPUT_DIR" -type f -name '*.apk')
+          if (( ${#apks[@]} == 0 )); then
+            echo "::error::No APKs found under $OUTPUT_DIR to verify."
+            exit 1
+          fi
+
+          for apk in "${apks[@]}"; do
+            dn=$("$apksigner" verify --print-certs "$apk" \
+                  | grep -m1 'certificate DN' || true)
+            echo "$(basename "$apk") -> ${dn:-<no signer found>}"
+
+            if [[ -z "$dn" ]]; then
+              echo "::error::Could not read a signer certificate from $apk."
+              exit 1
+            fi
+            if [[ "$dn" == *"Android Debug"* ]]; then
+              echo "::error::$apk is DEBUG-signed. Publishing it would make in-place updates impossible."
+              exit 1
+            fi
+          done
+
+          echo "All ${#apks[@]} APK(s) are release-signed."
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v7
