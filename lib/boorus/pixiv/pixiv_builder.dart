@@ -10,6 +10,7 @@ import '../../core/posts/details_parts/types.dart';
 import '../../core/posts/details_parts/widgets.dart';
 import 'configs/widgets.dart';
 import 'home/custom_home.dart';
+import 'home/pixiv_home_page.dart';
 import 'posts/types.dart';
 
 class PixivBuilder extends BaseBooruBuilder {
@@ -87,4 +88,8 @@ class PixivBuilder extends BaseBooruBuilder {
   @override
   Map<CustomHomeViewKey, CustomHomeDataBuilder> get customHomeViewBuilders =>
       pixivCustomHome;
+
+  @override
+  HomePageBuilder get homePageBuilder =>
+      (context) => const PixivHomePage();
 }
