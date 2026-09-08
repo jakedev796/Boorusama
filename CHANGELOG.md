@@ -1,3 +1,7 @@
+# 4.8.1
+- [Pixiv] The Explore header now scrolls away and returns when you scroll back up
+- [Pixiv] The daily ranking date can no longer be set to today, which showed yesterday's chart
+
 # 4.8.0
 - [Pixiv] Ranking is now Explore, with Following and Recommended feeds alongside it
 - [Pixiv] Add the R-18 ranking modes, with a notice when your Pixiv account has adult works hidden
