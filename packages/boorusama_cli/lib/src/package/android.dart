@@ -43,7 +43,7 @@ final class AndroidPackager implements Packager {
   }
 
   Artifact _packageSplitApks(Project project, BuildPlan plan) {
-    const abis = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
+    final abis = splitAbisFor(plan.flutterArgs);
     final targets = <File>[];
 
     plan.outputDir.createSync(recursive: true);
@@ -85,4 +85,51 @@ final class AndroidPackager implements Packager {
       source.renameSync(target.path);
     }
   }
+}
+
+/// ABI directories a `--split-per-abi` build will actually emit.
+///
+/// `flutter build apk` splits across all three ABIs unless narrowed by
+/// `--target-platform`, so the packager has to read the same args rather than
+/// assume a fixed set — otherwise it looks for APKs that were never built.
+List<String> splitAbisFor(List<String> flutterArgs) {
+  const abiForPlatform = {
+    'android-arm64': 'arm64-v8a',
+    'android-arm': 'armeabi-v7a',
+    'android-x64': 'x86_64',
+  };
+  const allAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
+
+  final platforms = _targetPlatforms(flutterArgs);
+  if (platforms.isEmpty) return allAbis;
+
+  final selected = platforms
+      .map((e) => abiForPlatform[e])
+      .whereType<String>()
+      .toSet();
+
+  // An unrecognised or non-Android platform leaves nothing to narrow by, so
+  // fall back to the full set rather than silently packaging nothing.
+  if (selected.isEmpty) return allAbis;
+
+  return allAbis.where(selected.contains).toList();
+}
+
+/// Reads `--target-platform a,b` and `--target-platform=a,b`, which Flutter
+/// accepts interchangeably and may repeat.
+List<String> _targetPlatforms(List<String> flutterArgs) {
+  const flag = '--target-platform';
+  final values = <String>[];
+
+  for (var i = 0; i < flutterArgs.length; i++) {
+    final arg = flutterArgs[i];
+
+    if (arg == flag && i + 1 < flutterArgs.length) {
+      values.addAll(flutterArgs[i + 1].split(','));
+    } else if (arg.startsWith('$flag=')) {
+      values.addAll(arg.substring(flag.length + 1).split(','));
+    }
+  }
+
+  return values.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 }
