@@ -97,9 +97,14 @@ Run all of this on Linux/WSL2 — steps 2 and 3 cannot pass on Windows.
    (deprecated `prefer_final_parameters` lint, some `unawaited_return_in_try_block`, and
    `prefer_initializing_formals` in the vendored `packages/extended_image`). Do not add errors; do not
    feel obliged to fix the pre-existing ones.
-4. **Test** — `flutter test`. Expect **530 passed / 1 failed of 531** (see Known failing test).
+4. **Test** — `flutter test`. Expect **563 passed / 1 failed of 564** (see Known failing test).
+   If you touched `packages/boorusama_cli`, also run its own suite, which `flutter test` does not
+   cover: `cd packages/boorusama_cli && dart test` — expect **81 passed**.
    If anything else fails, re-run it against `master` before assuming you caused it — several failures
    here have been pre-existing.
+
+   These counts go stale. Verify against `master` rather than trusting them; a stale hardcoded value
+   in a test is what broke `image_url_resolver_test.dart`.
 5. **Commit** — conventional commits, summary only, no body:
    `fix(posts): handle null tags`. One concern per commit.
 6. **Branch off `master`** and open the PR with `gh pr create --base master`. Prefer independent
@@ -123,6 +128,86 @@ entirely when `task.skipIfExists` and the file exists. The *test* is wrong: its 
 per-post filename format, which touches `test/bulk_downloads/providers/downloads/common.dart` and so
 every test in that suite.
 
+## Cutting a release
+
+Only the **repository owner** can run it — both jobs are gated
+`if: github.actor == github.repository_owner`. Android is the only target built.
+
+1. **Bump the version** in `pubspec.yaml` and add a matching `CHANGELOG.md` section. The heading has
+   to equal the version name exactly: `Changelog(...).sectionFor(version.name)` feeds the release
+   notes, so `# 4.6.0` for `version: 4.6.0+186`.
+2. **Tag with a `v` prefix and push it.** The workflow does `checkout` with
+   `ref: inputs.release_tag`, so **anything not in the tagged commit is not in the release** — a fix
+   merged to `master` after tagging is invisible until the tag moves.
+3. **Dispatch:**
+   ```bash
+   gh workflow run github-release.yml -f release_tag=vX.Y.Z -f prerelease=true -f recreate_release=false
+   ```
+   `recreate_release=true` deletes an existing release *and its tag* before republishing.
+
+Logs are only downloadable per-job while a run is in progress
+(`gh api repos/<owner>/<repo>/actions/jobs/<id>/logs --allow-escape-sequences`); `gh run view --log`
+refuses until the whole run finishes.
+
+### Four places have to agree about targets
+
+Reducing or narrowing what gets built breaks the things that consume it. This caused three separate
+release failures; they fail *late*, in packaging or publishing, after a long build:
+
+| Place | Decides |
+|---|---|
+| `.github/workflows/github-release.yml` matrix | which targets are built |
+| `_extraFlutterArgsFor` in `command/release/github/build.dart` | which Android ABIs |
+| `splitAbisFor` in `package/android.dart` | which split APKs get packaged |
+| `--target` on the publish step | which receipts are *required* |
+
+`splitAbisFor` now derives ABIs from `--target-platform`, so it follows the build automatically. The
+publish `--target` does **not** — left unset it requires a receipt for all six targets and fails for
+every one the matrix no longer builds.
+
+### CI needs meson and nasm
+
+`package:libavif` builds vendored dav1d from source. The `ubuntu-24.04`, `windows-2025` and
+`macos-26-arm64` runner images ship cmake, ninja, rustup and cargo but **not meson or nasm**, so the
+workflow installs those two before `Initialize workspace` — `init.sh` runs `gen.sh`, which also
+triggers build hooks. This is the same toolchain described under Environment gotchas.
+
+### Windows cannot be released
+
+`windows-zip` fails at `FileTracker : error FTK1011` on a **265-character path against MAX_PATH's
+260** — `libavif`'s CMake `TryCompile` scratch directory, from a repo root of only 24 chars.
+`LongPathsEnabled` does not help; MSBuild's FileTracker is legacy MAX_PATH-bound. Same root cause as
+the local Windows limitation.
+
+### Build time: cache the Gradle home, don't trim ABIs
+
+Measured across three release runs:
+
+| ABIs | Gradle cache | `assembleProdRelease` |
+|---|---|---|
+| 3 | none | 762s |
+| arm64 only | none | 784s |
+| arm64 only | restored | **310s** |
+
+ABI count is close to free — narrowing to arm64 saved nothing and cost 32-bit and emulator support.
+The win is restoring `~/.gradle`, which is why the workflow caches it and `org.gradle.caching=true` is
+set in `android/gradle.properties`. Note `android/gradle.properties` is listed explicitly in the cache
+key because the `android/**/*.gradle*` glob does **not** match it — the pattern needs a literal
+`.gradle` substring.
+
+Do not trust intuition about where the time goes here; measure with
+`gh api repos/<owner>/<repo>/actions/jobs/<id> --jq '.steps[]'`. `Install Android SDK packages` looks
+expensive and takes 1 second; Gradle separately downloads NDK 27 and CMake 3.22.1 mid-build even
+though the workflow pre-installs NDK 28.2.
+
+### Google Play is not automated
+
+`github-release.yml` only ever publishes a GitHub release — no fastlane, no `upload-google-play`, no
+App Store. `./release.sh` (`release all`) *does* include a Play draft step, but it needs
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` and `GOOGLE_PLAY_PACKAGE_NAME`, neither of which is configured, so
+it throws before touching the API. `rollbackDraft` is deliberately a no-op — a committed Play draft
+cannot be un-consumed — so wire credentials up only if you mean it.
+
 ## Fork divergence
 
 **Plus / premium is unconditional.** Upstream gates premium features behind a RevenueCat entitlement,
@@ -131,6 +216,9 @@ a `PREMIUM_MODE` dart-define, and a FOSS-build exclusion. In this fork
 `showPremiumFeatsProvider` unconditionally, and `kForcePremium` is a `const true` — so every install is
 Plus and the upsell entry points that guard on `!kForcePremium` never render. The `PREMIUM_MODE`
 define, `PremiumMode` enum and `premiumManagementURLProvider` are gone.
+
+`BuildRequirements.requiredEnv` returns nothing as a result. Upstream required a RevenueCat API key
+for prod `apk`/`aab`/`ipa` builds; with no entitlement to read, that key only blocked releases.
 
 The RevenueCat SDK, `lib/foundation/vendors/revenuecat/`, and the purchase pages are still present but
 no longer consulted for entitlement, so RevenueCat is not initialised at startup. Free-user limit
