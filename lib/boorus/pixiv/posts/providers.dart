@@ -51,10 +51,16 @@ final pixivPostRepoProvider =
                 page: page,
               )).illusts;
             } else {
-              // Pixiv has no tag-less "recent" browse endpoint outside of
-              // ranking (a later slice) — an empty query yields an empty
-              // page instead of calling search with a blank word.
-              illusts = const [];
+              // Pixiv has no tag-less "recent" browse endpoint, so an empty
+              // query would otherwise render as a blank grid, which reads as
+              // broken. Fall back to the newest daily ranking snapshot
+              // instead (see ranking/providers.dart for the same call with
+              // date clamping/omission; here the date is simply omitted so
+              // the API returns whatever it considers newest).
+              illusts = (await client.getRanking(
+                mode: PixivRankingMode.day,
+                page: page,
+              )).illusts;
             }
 
             return illustDtosToPosts(

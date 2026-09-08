@@ -9,6 +9,7 @@ import '../../core/posts/details/widgets.dart';
 import '../../core/posts/details_parts/types.dart';
 import '../../core/posts/details_parts/widgets.dart';
 import 'configs/widgets.dart';
+import 'home/custom_home.dart';
 import 'posts/types.dart';
 
 class PixivBuilder extends BaseBooruBuilder {
@@ -83,10 +84,7 @@ class PixivBuilder extends BaseBooruBuilder {
     },
   );
 
-  /// Spread from the shared default for now — S4 adds the Ranking page as
-  /// an extra entry here.
   @override
-  Map<CustomHomeViewKey, CustomHomeDataBuilder> get customHomeViewBuilders => {
-    ...kDefaultAltHomeView,
-  };
+  Map<CustomHomeViewKey, CustomHomeDataBuilder> get customHomeViewBuilders =>
+      pixivCustomHome;
 }
