@@ -5,6 +5,7 @@ import 'package:kurumi/material.dart';
 // Project imports:
 import '../boorus/danbooru/router.dart';
 import '../boorus/eshuushuu/router.dart';
+import '../boorus/pawchive/router.dart';
 import '../boorus/pixiv/router.dart';
 import '../boorus/shimmie2/router.dart';
 import '../boorus/szurubooru/router.dart';
@@ -30,6 +31,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       Routes.home(ref),
       ...danbooruRoutes,
       ...eshuushuuRoutes,
+      ...pawchiveRoutes,
       ...pixivRoutes,
       ...shimmie2Routes,
       ...szurubooruRoutes,
