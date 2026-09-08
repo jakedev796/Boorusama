@@ -87,6 +87,29 @@ jobs:
           set -euo pipefail
           sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
 
+      - name: Install native asset build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          # package:libavif builds vendored dav1d from source with Meson and
+          # NASM, then a Rust crate. Runner images ship cmake, ninja and
+          # rustup, but not meson or nasm, so every target that compiles
+          # native assets needs these two added.
+          case "${{ runner.os }}" in
+            Linux)
+              sudo apt-get update
+              sudo apt-get install -y meson nasm
+              ;;
+            macOS)
+              brew install meson nasm
+              ;;
+            Windows)
+              choco install --no-progress --yes nasm
+              python -m pip install --disable-pip-version-check meson
+              echo 'C:\Program Files\NASM' >> "$GITHUB_PATH"
+              ;;
+          esac
+
       - name: Install Linux desktop dependencies
         if: matrix.target == 'linux-tar.gz' || matrix.target == 'appimage'
         shell: bash
