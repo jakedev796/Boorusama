@@ -20,10 +20,6 @@ import 'feed.dart';
 /// formula surfaces as a broken assertion rather than a silent mismatch.
 int pixivRankingOffsetFor(int page) => (page - 1) * 30;
 
-/// Earliest date pixiv's ranking endpoint accepts — verified live; earlier
-/// dates 404.
-final kPixivRankingEarliestDate = DateTime.utc(2007, 9, 13);
-
 /// Maps the shared [TimeScale] control onto pixiv's ranking modes.
 ///
 /// This only covers the day/week/month scale toggle offered within the
