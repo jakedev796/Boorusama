@@ -1,3 +1,6 @@
+# 4.7.1
+- [Pixiv] Fix Pixiv not being recognized when adding it as a source
+
 # 4.7.0
 - Add support for Pixiv
 - [Pixiv] Log in with your own Pixiv account
