@@ -8,6 +8,7 @@ import '../../core/posts/details/widgets.dart';
 import '../../core/posts/details_parts/types.dart';
 import '../../core/posts/details_parts/widgets.dart';
 import 'home/custom_home.dart';
+import 'home/pawchive_home_page.dart';
 import 'posts/types.dart';
 
 class PawchiveBuilder extends BaseBooruBuilder {
@@ -64,4 +65,8 @@ class PawchiveBuilder extends BaseBooruBuilder {
   @override
   Map<CustomHomeViewKey, CustomHomeDataBuilder> get customHomeViewBuilders =>
       pawchiveCustomHome;
+
+  @override
+  HomePageBuilder get homePageBuilder =>
+      (context) => const PawchiveHomePage();
 }
