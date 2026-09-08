@@ -1,3 +1,7 @@
+# 4.7.3
+- Release builds are now genuinely signed with a persistent key; 4.7.2 was still debug-signed
+  (upgrading to this build needs one reinstall, after which updates install in place)
+
 # 4.7.2
 - [Pixiv] Fix downloads failing, and every file being saved under the same name
 - [Pixiv] Use a higher-quality image when viewing a post
