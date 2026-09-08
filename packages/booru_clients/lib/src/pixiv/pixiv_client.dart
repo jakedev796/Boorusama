@@ -55,6 +55,47 @@ class PixivClient {
     return PixivIllustListResult.fromJson(body);
   }
 
+  /// `GET /v2/illust/follow` — illusts from followed artists.
+  ///
+  /// [restrict] filters by whether the *follow relationship* is public or
+  /// private, not by the artwork's own visibility — `all` (the default) is
+  /// correct for a normal feed.
+  Future<PixivIllustListResult> getFollowedIllusts({
+    PixivFollowRestrict restrict = PixivFollowRestrict.all,
+    required int page,
+  }) async {
+    final body = await _get(
+      '/v2/illust/follow',
+      queryParameters: {
+        'restrict': restrict.value,
+        'offset': _offsetFor(page),
+        'filter': _kFilter,
+      },
+    );
+
+    return PixivIllustListResult.fromJson(body);
+  }
+
+  /// `GET /v1/illust/recommended` — the personalized recommended feed.
+  ///
+  /// Requests `include_ranking_illusts=true` to match app behavior; the
+  /// response's extra `ranking_illusts` section is ignored, only `illusts`
+  /// is parsed.
+  Future<PixivIllustListResult> getRecommendedIllusts({
+    required int page,
+  }) async {
+    final body = await _get(
+      '/v1/illust/recommended',
+      queryParameters: {
+        'include_ranking_illusts': true,
+        'offset': _offsetFor(page),
+        'filter': _kFilter,
+      },
+    );
+
+    return PixivIllustListResult.fromJson(body);
+  }
+
   Future<PixivIllustListResult> searchIllust({
     required String word,
     PixivSearchTarget searchTarget = PixivSearchTarget.partialMatchForTags,
