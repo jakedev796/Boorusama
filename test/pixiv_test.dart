@@ -280,6 +280,100 @@ void main() {
     });
   });
 
+  group('sample url resolution', () {
+    test('prefers the large variant for a single-page work', () {
+      final result = illustDtoToPosts(
+        illust(
+          imageUrls: {
+            'square_medium': 'sq.jpg',
+            'medium': 'med.jpg',
+            'large': 'large.jpg',
+          },
+        ),
+      ).single;
+
+      expect(result.sampleImageUrl, 'large.jpg');
+    });
+
+    test(
+      'falls back to medium when large is absent for a single-page work',
+      () {
+        final result = illustDtoToPosts(
+          illust(
+            imageUrls: {'square_medium': 'sq.jpg', 'medium': 'med.jpg'},
+          ),
+        ).single;
+
+        expect(result.sampleImageUrl, 'med.jpg');
+      },
+    );
+
+    test('prefers the large variant for a page from meta_pages', () {
+      final result = illustDtoToPosts(
+        illust(
+          imageUrls: {
+            'square_medium': 'sq0.jpg',
+            'medium': 'med0.jpg',
+            'large': 'large0.jpg',
+          },
+          pageCount: 2,
+          metaSinglePage: const {},
+          metaPages: [
+            {
+              'image_urls': {
+                'square_medium': 'sq0.jpg',
+                'medium': 'med0.jpg',
+                'large': 'large0.jpg',
+                'original': 'https://i.pximg.net/img/100_p0.jpg',
+              },
+            },
+            {
+              'image_urls': {
+                'square_medium': 'sq1.jpg',
+                'medium': 'med1.jpg',
+                'large': 'large1.jpg',
+                'original': 'https://i.pximg.net/img/100_p1.jpg',
+              },
+            },
+          ],
+        ),
+      );
+
+      expect(result.map((e) => e.sampleImageUrl), ['large0.jpg', 'large1.jpg']);
+    });
+
+    test(
+      'falls back to medium when large is absent for a page from meta_pages',
+      () {
+        final result = illustDtoToPosts(
+          illust(
+            imageUrls: {'square_medium': 'sq0.jpg', 'medium': 'med0.jpg'},
+            pageCount: 2,
+            metaSinglePage: const {},
+            metaPages: [
+              {
+                'image_urls': {
+                  'square_medium': 'sq0.jpg',
+                  'medium': 'med0.jpg',
+                  'original': 'https://i.pximg.net/img/100_p0.jpg',
+                },
+              },
+              {
+                'image_urls': {
+                  'square_medium': 'sq1.jpg',
+                  'medium': 'med1.jpg',
+                  'original': 'https://i.pximg.net/img/100_p1.jpg',
+                },
+              },
+            ],
+          ),
+        );
+
+        expect(result.map((e) => e.sampleImageUrl), ['med0.jpg', 'med1.jpg']);
+      },
+    );
+  });
+
   group('link generation', () {
     test('produces the canonical artwork url for every page of a work', () {
       const generator = PixivPostLinkGenerator();
