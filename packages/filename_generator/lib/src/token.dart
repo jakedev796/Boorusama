@@ -16,7 +16,9 @@ class TokenizerConfigs {
     required this.namespacedTokens,
   });
 
-  factory TokenizerConfigs.defaultConfigs() {
+  factory TokenizerConfigs.defaultConfigs({
+    Set<String> extraTokens = const {},
+  }) {
     final tagTokenOptions = [
       'maxlength',
       'unsafe',
@@ -55,6 +57,10 @@ class TokenizerConfigs {
 
     return TokenizerConfigs(
       tokenDefinitions: {
+        for (final token in extraTokens)
+          token: [
+            ...stringTokenOptions,
+          ],
         'md5': [
           'maxlength',
           'case',

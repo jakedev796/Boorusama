@@ -33,6 +33,13 @@ class DownloadFileNameBuilder<T extends Post>
   }) {
     final customHandlers = tokenHandlers.toMap();
 
+    tokenizerConfigs = TokenizerConfigs.defaultConfigs(
+      extraTokens: {
+        ...customHandlers.keys,
+        ...asyncTokenHandlers.expand((h) => h.tokenKeys),
+      },
+    );
+
     baseTokenHandlers = {
       'id': (post, config) => post.id.toString(),
       'tags': (post, config) => post.tags.join(' '),
@@ -69,7 +76,7 @@ class DownloadFileNameBuilder<T extends Post>
   // Cache for resolved async tokens: postId -> groupKey -> resolved data
   final Map<String, Map<String, Map<String, String?>>> _asyncCache = {};
 
-  final tokenizerConfigs = TokenizerConfigs.defaultConfigs();
+  late final TokenizerConfigs tokenizerConfigs;
 
   @override
   List<TokenInfo> get availableTokens {
