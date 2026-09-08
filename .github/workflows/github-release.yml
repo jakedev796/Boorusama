@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.actor == 'khoadng'
+    if: github.actor == github.repository_owner
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
@@ -67,7 +67,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.41.9
+          flutter-version: 3.47.2
           cache: true
 
       - name: Set up Xcode
@@ -152,7 +152,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.actor == 'khoadng'
+    if: github.actor == github.repository_owner
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -168,7 +168,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.41.9
+          flutter-version: 3.47.2
           cache: true
 
       - name: Download build artifacts
