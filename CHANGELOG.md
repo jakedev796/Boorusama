@@ -1,3 +1,8 @@
+# 4.8.0
+- [Pixiv] Ranking is now Explore, with Following and Recommended feeds alongside it
+- [Pixiv] Add the R-18 ranking modes, with a notice when your Pixiv account has adult works hidden
+- [Pixiv] Fix the date picker being hidden behind the system navigation bar
+
 # 4.7.3
 - Release builds are now genuinely signed with a persistent key; 4.7.2 was still debug-signed
   (upgrading to this build needs one reinstall, after which updates install in place)
