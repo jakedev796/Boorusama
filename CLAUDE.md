@@ -99,7 +99,7 @@ Run all of this on Linux/WSL2 — steps 2 and 3 cannot pass on Windows.
    feel obliged to fix the pre-existing ones.
 4. **Test** — there are **two layers**, and the second is easy to miss entirely.
 
-   a. `flutter test` at the repo root — expect **645 passed / 1 failed of 646** (see Known failing
+   a. `flutter test` at the repo root — expect **652 passed / 1 failed of 653** (see Known failing
       test). This runs only the root `test/` tree.
 
    b. Root `flutter test` does **not** run any workspace package's own suite. Ten packages have one,
