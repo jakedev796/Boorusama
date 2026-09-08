@@ -1379,6 +1379,9 @@
       "paste_token_hint": "*Only paste a refresh token you generated yourself. Anyone holding it has full access to your Pixiv account.",
       "premium_account": "Pixiv Premium",
       "credential_export_warning": "Your Pixiv refresh token is a long-lived, full-account credential. It is stored unencrypted and is included in profile backups and in the local network profile transfer."
+    },
+    "ranking": {
+      "title": "Ranking"
     }
   }
 }
