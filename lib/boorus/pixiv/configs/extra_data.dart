@@ -17,6 +17,7 @@ class PixivExtraData {
     this.userId,
     this.userName,
     this.isPremium,
+    this.xRestrict,
     this.tokenExpiry,
   });
 
@@ -42,6 +43,10 @@ class PixivExtraData {
           final bool premium => premium,
           _ => null,
         },
+        xRestrict: switch (json['xRestrict']) {
+          final int x => x,
+          _ => null,
+        },
         tokenExpiry: switch (json['tokenExpiry']) {
           final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
           _ => null,
@@ -58,12 +63,14 @@ class PixivExtraData {
     required String? userId,
     required String? userName,
     required bool? isPremium,
+    required int? xRestrict,
     required int? expiresIn,
     DateTime? now,
   }) => PixivExtraData(
     userId: userId,
     userName: userName,
     isPremium: isPremium,
+    xRestrict: xRestrict,
     tokenExpiry: expiresIn == null
         ? null
         : (now ?? DateTime.now()).add(Duration(seconds: expiresIn)),
@@ -72,6 +79,12 @@ class PixivExtraData {
   final String? userId;
   final String? userName;
   final bool? isPremium;
+
+  /// The account's content-setting level, as reported by the token
+  /// endpoint's embedded user object: 0 = all-ages only, 1 = R-18
+  /// permitted, 2 = R-18G permitted. Distinct from the same-named field on
+  /// an illust, which is that work's own rating.
+  final int? xRestrict;
 
   /// When the *access* token obtained alongside this metadata stops working.
   /// The refresh token in `apiKey` outlives it and has no published expiry,
@@ -84,6 +97,7 @@ class PixivExtraData {
     userId: userId,
     userName: userName,
     isPremium: isPremium,
+    xRestrict: xRestrict,
     tokenExpiry: tokenExpiry ?? this.tokenExpiry,
   );
 
@@ -91,6 +105,7 @@ class PixivExtraData {
     'userId': ?userId,
     'userName': ?userName,
     'isPremium': ?isPremium,
+    'xRestrict': ?xRestrict,
     'tokenExpiry': ?tokenExpiry?.millisecondsSinceEpoch,
   });
 }

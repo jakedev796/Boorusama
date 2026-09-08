@@ -1380,8 +1380,42 @@
       "premium_account": "Pixiv Premium",
       "credential_export_warning": "Your Pixiv refresh token is a long-lived, full-account credential. It is stored unencrypted and is included in profile backups and in the local network profile transfer."
     },
-    "ranking": {
-      "title": "Ranking"
+    "explore": {
+      "title": "Explore",
+      "x_restrict_warning": "Your Pixiv account has R-18 works hidden. Enable it in your pixiv.net account settings — this feed will stay empty until you do.",
+      "feed": {
+        "ranking": "Ranking",
+        "following": "Following",
+        "recommended": "Recommended"
+      },
+      "follow_restrict": {
+        "all": "All",
+        "public": "Public",
+        "private": "Private"
+      },
+      "ranking_mode": {
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly",
+        "day_male": "Male",
+        "day_female": "Female",
+        "week_original": "Original",
+        "week_rookie": "Rookie",
+        "day_manga": "Daily Manga",
+        "week_manga": "Weekly Manga",
+        "month_manga": "Monthly Manga",
+        "week_rookie_manga": "Rookie Manga",
+        "day_ai": "Daily AI",
+        "day_r18": "R-18 Daily",
+        "day_r18_ai": "R-18 Daily AI",
+        "day_male_r18": "R-18 Male",
+        "day_female_r18": "R-18 Female",
+        "day_r18_manga": "R-18 Daily Manga",
+        "week_r18": "R-18 Weekly",
+        "week_r18_manga": "R-18 Weekly Manga",
+        "week_r18g": "R-18G",
+        "week_r18g_manga": "R-18G Manga"
+      }
     }
   }
 }

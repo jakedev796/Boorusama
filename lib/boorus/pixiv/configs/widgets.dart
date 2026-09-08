@@ -105,6 +105,7 @@ class PixivAuthConfigView extends ConsumerWidget {
       userId: user?.id,
       userName: user?.name,
       isPremium: user?.isPremium,
+      xRestrict: user?.xRestrict,
       expiresIn: tokens.expiresIn,
     );
 

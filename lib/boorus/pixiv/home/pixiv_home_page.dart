@@ -6,10 +6,10 @@ import 'package:material_symbols_icons/symbols.dart';
 
 // Project imports:
 import '../../../core/home/widgets.dart';
-import '../ranking/widgets.dart';
+import '../explore/widgets.dart';
 import '../router.dart';
 
-/// Puts the Ranking page in the app's navigation (mobile drawer and
+/// Puts the Explore page in the app's navigation (mobile drawer and
 /// desktop rail) alongside the existing custom-home entry in
 /// `home/custom_home.dart`, so it is reachable without switching the
 /// home-screen layout, matching how Danbooru/e621 surface their own
@@ -25,8 +25,8 @@ class PixivHomePage extends ConsumerWidget {
       mobileMenu: [
         SideMenuTile(
           icon: const Icon(Symbols.leaderboard),
-          title: Text(context.t.pixiv.ranking.title),
-          onTap: () => goToPixivRankingPage(ref),
+          title: Text(context.t.pixiv.explore.title),
+          onTap: () => goToPixivExplorePage(ref),
         ),
       ],
       desktopMenuBuilder: (context, constraints) => [
@@ -35,11 +35,11 @@ class PixivHomePage extends ConsumerWidget {
           constraints: constraints,
           selectedIcon: Symbols.leaderboard,
           icon: Symbols.leaderboard,
-          title: context.t.pixiv.ranking.title,
+          title: context.t.pixiv.explore.title,
         ),
       ],
       desktopViews: const [
-        PixivRankingPage(),
+        PixivExplorePage(),
       ],
     );
   }

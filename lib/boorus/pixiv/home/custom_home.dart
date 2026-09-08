@@ -3,16 +3,16 @@ import 'package:i18n/i18n.dart';
 
 // Project imports:
 import '../../../core/home/types.dart';
-import '../ranking/widgets.dart';
+import '../explore/widgets.dart';
 
-/// The Ranking page offered as an alternate home view — pre-made
-/// Day/Week/Month popularity filters with step back/forward through
-/// pixiv's per-day ranking snapshots. Not the default: most users land on
-/// the regular search/browse feed, with ranking as an opt-in alternative.
+/// The Explore page offered as an alternate home view — a feed selector
+/// (Ranking / Following / Recommended) over a shared post grid. Not the
+/// default: most users land on the regular search/browse feed, with
+/// Explore as an opt-in alternative.
 final pixivCustomHome = {
   ...kDefaultAltHomeView,
-  const CustomHomeViewKey('ranking'): CustomHomeDataBuilder(
-    displayName: (context) => context.t.pixiv.ranking.title,
-    builder: (context, _) => const PixivRankingPage(),
+  const CustomHomeViewKey('explore'): CustomHomeDataBuilder(
+    displayName: (context) => context.t.pixiv.explore.title,
+    builder: (context, _) => const PixivExplorePage(),
   ),
 };
