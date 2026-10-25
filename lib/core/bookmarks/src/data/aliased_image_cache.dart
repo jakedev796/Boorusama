@@ -12,12 +12,17 @@ class AliasedImageCacheManager implements ImageCacheManager {
   AliasedImageCacheManager({
     required this.inner,
     required this.aliases,
+    this.rejectSave,
   });
 
   final ImageCacheManager inner;
 
-  /// Maps a refreshed URL to the stored URL whose cache key it should use.
+  /// Maps a refreshed URL to the URL whose cache key it should use.
   final Map<String, String> aliases;
+
+  /// Bytes that must not be cached, such as an expired-link placeholder that
+  /// would otherwise stay in place of the real file.
+  final bool Function(Uint8List bytes)? rejectSave;
 
   @override
   String generateCacheKey(String url, {String? customKey}) =>
@@ -32,8 +37,11 @@ class AliasedImageCacheManager implements ImageCacheManager {
       inner.getCachedFileBytes(key, maxAge: maxAge);
 
   @override
-  Future<void> saveFile(String key, Uint8List bytes) =>
-      inner.saveFile(key, bytes);
+  Future<void> saveFile(String key, Uint8List bytes) async {
+    if (rejectSave?.call(bytes) ?? false) return;
+
+    await inner.saveFile(key, bytes);
+  }
 
   @override
   FutureOr<bool> hasValidCache(String key, {Duration? maxAge}) =>

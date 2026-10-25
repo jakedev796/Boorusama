@@ -24,6 +24,7 @@ import '../data/bookmark_convert.dart';
 import '../data/providers.dart';
 import '../providers/bookmark_media_provider.dart';
 import '../providers/bookmark_provider.dart';
+import '../types/bookmark_media.dart';
 import '../widgets/bookmark_tag_tiles.dart';
 
 class BookmarkDetailsPage extends ConsumerWidget {
@@ -144,13 +145,18 @@ class _BookmarkDetailsPageState
         );
         // Only the displayed media follows refreshed URLs; the post itself
         // keeps its stored URLs because bookmark identity is derived from them.
-        final freshMedia = ref
-            .watch(bookmarkMediaUrlsProvider(post.bookmark))
-            .valueOrNull;
+        final freshMedia = switch (ref.watchBookmarkMedia(post.bookmark)) {
+          BookmarkMediaRefreshed(:final urls) => urls,
+          _ => null,
+        };
+        final refresher = ref.watch(
+          bookmarkMediaRefresherProvider(post.bookmark),
+        );
         final itemCacheManager = switch ((freshMedia, imageCacheManager)) {
           (final fresh?, final cache?) => AliasedImageCacheManager(
             inner: cache,
-            aliases: {fresh.originalUrl: fresh.originalCacheUrl},
+            aliases: fresh.cacheAliases,
+            rejectSave: refresher?.isExpiredPlaceholder,
           ),
           _ => imageCacheManager,
         };

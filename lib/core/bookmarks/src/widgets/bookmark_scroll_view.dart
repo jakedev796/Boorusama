@@ -23,8 +23,11 @@ import '../../../posts/listing/widgets.dart';
 import '../../../posts/post/types.dart';
 import '../../../widgets/widgets.dart';
 import '../../types.dart';
+import '../data/aliased_image_cache.dart';
 import '../data/bookmark_convert.dart';
+import '../data/bookmark_tile_media.dart';
 import '../data/providers.dart';
+import '../providers/bookmark_media_provider.dart';
 import '../providers/bookmark_provider.dart';
 import '../providers/bookmark_shuffle_provider.dart';
 import '../providers/local_providers.dart';
@@ -260,38 +263,62 @@ class _BookmarkScrollViewState extends ConsumerState<BookmarkScrollView> {
               post: post,
               index: index,
               controller: controller,
-              child: DefaultImageGridItem(
-                index: index,
-                autoScrollController: widget.scrollController,
-                controller: controller,
-                imageUrl: post.isVideo
-                    ? post.thumbnailImageUrl
-                    : post.sampleImageUrl,
-                imageCacheManager: ref.watch(bookmarkImageCacheManagerProvider),
-                useHero: false,
-                config: auth,
-                imageConfig: ref
-                    .watch(
-                      firstMatchingConfigByBooruTypeProvider((
-                        post.bookmark.booruId,
-                        Uri.tryParse(post.bookmark.sourceUrl)?.host ?? '',
-                      )),
-                    )
-                    ?.auth,
-                leadingIcons: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ConfigAwareWebsiteLogo(url: post.bookmark.sourceUrl),
-                  ),
-                ],
-                onTap: () {
-                  goToBookmarkDetailsPage(
-                    ref,
-                    index,
-                    initialThumbnailUrl: post.isVideo
-                        ? post.bookmark.thumbnailUrl
-                        : post.sampleImageUrl,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final media = bookmarkTileMedia(
+                    ref.watchBookmarkMedia(post.bookmark),
+                    post,
+                  );
+                  final refresher = ref.watch(
+                    bookmarkMediaRefresherProvider(post.bookmark),
+                  );
+                  final cacheManager = ref.watch(
+                    bookmarkImageCacheManagerProvider,
+                  );
+
+                  return DefaultImageGridItem(
+                    index: index,
+                    autoScrollController: widget.scrollController,
                     controller: controller,
+                    imageUrl: media.imageUrl,
+                    imageCacheManager: switch ((
+                      media.cacheAliases,
+                      cacheManager,
+                    )) {
+                      (final aliases?, final cache?) =>
+                        AliasedImageCacheManager(
+                          inner: cache,
+                          aliases: aliases,
+                          rejectSave: refresher?.isExpiredPlaceholder,
+                        ),
+                      _ => cacheManager,
+                    },
+                    useHero: false,
+                    config: auth,
+                    imageConfig: ref
+                        .watch(
+                          firstMatchingConfigByBooruTypeProvider((
+                            post.bookmark.booruId,
+                            Uri.tryParse(post.bookmark.sourceUrl)?.host ?? '',
+                          )),
+                        )
+                        ?.auth,
+                    leadingIcons: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: ConfigAwareWebsiteLogo(
+                          url: post.bookmark.sourceUrl,
+                        ),
+                      ),
+                    ],
+                    onTap: () {
+                      goToBookmarkDetailsPage(
+                        ref,
+                        index,
+                        initialThumbnailUrl: media.initialThumbnailUrl,
+                        controller: controller,
+                      );
+                    },
                   );
                 },
               ),

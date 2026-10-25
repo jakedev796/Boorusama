@@ -177,10 +177,10 @@ class BookmarkNotifier extends AsyncNotifier<BookmarkState> {
     bookmark.originalUrl,
     bookmark.sampleUrl,
     bookmark.thumbnailUrl,
-    ?ref
+    ...?ref
         .read(booruEngineRegistryProvider)
         .getRepository(intToBooruType(bookmark.booruId))
-        ?.bookmarkOriginalCacheUrl(bookmark),
+        ?.bookmarkStableCacheUrls(bookmark),
   ];
 
   Future<void> removeBookmark(
