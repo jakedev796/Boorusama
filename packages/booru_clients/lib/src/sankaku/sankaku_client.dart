@@ -159,6 +159,13 @@ class SankakuClient {
     return PostDto.fromJson(data);
   }
 
+  /// The account name, which differs from the login when signing in by email.
+  Future<String?> getCurrentUsername() async {
+    final token = await _getToken();
+
+    return token?.currentUser?.name;
+  }
+
   Future<bool> addToFavorites({required SankakuId postId}) async {
     final token = await _getToken();
 

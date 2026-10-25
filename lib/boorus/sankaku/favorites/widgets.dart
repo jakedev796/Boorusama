@@ -7,6 +7,7 @@ import '../../../core/configs/auth/widgets.dart';
 import '../../../core/configs/config/providers.dart';
 import '../../../core/posts/favorites/widgets.dart';
 import '../posts/providers.dart';
+import 'providers.dart';
 
 class SankakuFavoritesPage extends ConsumerWidget {
   const SankakuFavoritesPage({super.key});
@@ -16,8 +17,34 @@ class SankakuFavoritesPage extends ConsumerWidget {
     final config = ref.watchConfigAuth;
 
     return BooruConfigAuthFailsafe(
-      builder: (_) => SankakuFavoritesPageInternal(
-        username: config.login!,
+      builder: (_) => ref
+          .watch(sankakuAccountNameProvider(config))
+          .when(
+            data: (username) => switch (username) {
+              final username? => SankakuFavoritesPageInternal(
+                username: username,
+              ),
+              null => const _AccountNameError(),
+            },
+            loading: () => const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            error: (_, _) => const _AccountNameError(),
+          ),
+    );
+  }
+}
+
+class _AccountNameError extends StatelessWidget {
+  const _AccountNameError();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Text('Could not find your Sankaku account name.'),
       ),
     );
   }

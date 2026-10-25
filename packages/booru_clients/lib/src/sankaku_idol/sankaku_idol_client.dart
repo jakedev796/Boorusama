@@ -80,6 +80,9 @@ class SankakuIdolClient implements SankakuClient {
     return idolPosts.map((e) => e.toSankakuPost()).toList();
   }
 
+  @override
+  Future<String?> getCurrentUsername() async => username;
+
   Future<List<PostIdolDto>> getIdolPosts({
     List<String>? tags,
     int? page = 1,

@@ -41,6 +41,18 @@ final sankakuCanFavoriteProvider = Provider.family<bool, BooruConfigAuth>((
       password.isNotEmpty;
 });
 
+/// Favorites are searched by account name, which differs from the login when
+/// the user signs in with an email address.
+final sankakuAccountNameProvider =
+    FutureProvider.family<String?, BooruConfigAuth>((ref, config) async {
+      return switch (config.login) {
+        null || '' => null,
+        final login when !login.contains('@') => login,
+        _ =>
+          await ref.watch(sankakuClientProvider(config)).getCurrentUsername(),
+      };
+    });
+
 class SankakuFavoritesNotifier
     extends FamilyNotifier<IMap<SankakuId, bool>, BooruConfigAuth> {
   @override
