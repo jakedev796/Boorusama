@@ -11,9 +11,11 @@ import '../../core/downloads/filename/types.dart';
 import '../../core/http/client/providers.dart';
 import '../../core/posts/post/types.dart';
 import '../../core/tags/autocompletes/types.dart';
+import '../../core/tags/metatag/types.dart';
 import '../../core/tags/tag/types.dart';
 import 'posts/providers.dart';
 import 'posts/types.dart';
+import 'tags/metatags.dart';
 import 'tags/providers.dart';
 
 class SankakuRepository extends BooruRepositoryDefault {
@@ -78,6 +80,11 @@ class SankakuRepository extends BooruRepositoryDefault {
         ),
       ],
     );
+  }
+
+  @override
+  MetatagExtractor? getMetatagExtractor(BooruConfigAuth config) {
+    return DefaultMetatagExtractor(metatags: kSankakuMetatags);
   }
 
   @override

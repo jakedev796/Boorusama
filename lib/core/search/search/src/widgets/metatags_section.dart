@@ -21,6 +21,7 @@ class MetatagsSection extends ConsumerStatefulWidget {
     required this.onUserMetatagAdded,
     super.key,
     this.onHelpRequest,
+    this.editable = true,
   });
 
   final ValueChanged<String>? onOptionTap;
@@ -29,6 +30,7 @@ class MetatagsSection extends ConsumerStatefulWidget {
   final void Function()? onHelpRequest;
   final Future<void> Function(String tag) onUserMetatagDeleted;
   final Future<void> Function(Metatag tag) onUserMetatagAdded;
+  final bool editable;
 
   @override
   ConsumerState<MetatagsSection> createState() => _MetatagsSectionState();
@@ -55,6 +57,7 @@ class _MetatagsSectionState extends ConsumerState<MetatagsSection> {
       ),
       child: OptionTagsArena(
         controller: controller,
+        editable: widget.editable,
         title: 'Metatags',
         titleTrailing: widget.onHelpRequest != null
             ? IconButton(
