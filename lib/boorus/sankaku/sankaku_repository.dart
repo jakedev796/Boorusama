@@ -89,14 +89,14 @@ class SankakuRepository extends BooruRepositoryDefault {
   BookmarkMediaRefresher? bookmarkMediaRefresher(BooruConfigAuth config) {
     final client = ref.read(sankakuClientProvider(config));
 
-    return sankakuBookmarkMediaRefresher(
+    return SankakuBookmarkMediaRefresher(
       fetchPost: (id) => client.getPost(id: id),
     );
   }
 
   @override
-  String? bookmarkOriginalCacheUrl(Bookmark bookmark) =>
-      sankakuOriginalCacheUrl(bookmark.originalUrl);
+  Iterable<String> bookmarkStableCacheUrls(Bookmark bookmark) =>
+      sankakuStableCacheUrls(bookmark);
 
   @override
   MetatagExtractor? getMetatagExtractor(BooruConfigAuth config) {

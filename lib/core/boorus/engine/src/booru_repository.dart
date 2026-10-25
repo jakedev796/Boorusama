@@ -49,7 +49,7 @@ abstract class BooruRepository {
   TagExtractor tagExtractor(BooruConfigAuth config);
   MetatagExtractor? getMetatagExtractor(BooruConfigAuth config);
   BookmarkMediaRefresher? bookmarkMediaRefresher(BooruConfigAuth config);
-  String? bookmarkOriginalCacheUrl(Bookmark bookmark);
+  Iterable<String> bookmarkStableCacheUrls(Bookmark bookmark);
   CommentRepository comment(BooruConfigAuth config);
   TextMarkupRepository? textMarkup(BooruConfigAuth config);
   Dio dio(BooruConfigAuth config);

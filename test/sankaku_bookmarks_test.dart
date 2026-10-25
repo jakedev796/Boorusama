@@ -12,7 +12,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:boorusama/boorus/e621/e621_repository.dart';
 import 'package:boorusama/boorus/sankaku/bookmarks/types.dart';
 import 'package:boorusama/boorus/sankaku/sankaku_repository.dart';
+import 'package:boorusama/core/bookmarks/providers.dart';
 import 'package:boorusama/core/bookmarks/src/data/aliased_image_cache.dart';
+import 'package:boorusama/core/bookmarks/src/data/bookmark_convert.dart';
+import 'package:boorusama/core/bookmarks/src/data/bookmark_tile_media.dart';
 import 'package:boorusama/core/bookmarks/types.dart';
 import 'package:boorusama/core/boorus/booru/types.dart';
 import 'package:boorusama/core/configs/config/types.dart';
@@ -28,14 +31,17 @@ String _signed(String path, int expiry) =>
 
 Bookmark _bookmark({
   required String originalUrl,
+  String? sampleUrl,
+  String? thumbnailUrl,
+  String? format,
   String sourceUrl = 'https://chan.sankakucomplex.com/post/62946932',
 }) => Bookmark(
   id: 1,
   booruId: 27,
   createdAt: _now,
   updatedAt: _now,
-  thumbnailUrl: originalUrl,
-  sampleUrl: originalUrl,
+  thumbnailUrl: thumbnailUrl ?? originalUrl,
+  sampleUrl: sampleUrl ?? originalUrl,
   originalUrl: originalUrl,
   sourceUrl: sourceUrl,
   width: 100,
@@ -43,10 +49,26 @@ Bookmark _bookmark({
   md5: 'md5',
   tags: const {},
   realSourceUrl: null,
-  format: null,
+  format: format,
   imageUrlResolver: const DefaultImageUrlResolver(),
   postId: null,
   metadata: const {},
+);
+
+BookmarkMediaUrls _urls({DateTime? expiresAt, String tag = 'a'}) =>
+    BookmarkMediaUrls(
+      thumbnailUrl: 'https://fresh/$tag/preview.avif',
+      sampleUrl: 'https://fresh/$tag/sample.webp',
+      originalUrl: 'https://fresh/$tag/file.jpg',
+      cacheAliases: {'https://fresh/$tag/file.jpg': 'https://stable/file.jpg'},
+      expiresAt: expiresAt,
+    );
+
+SankakuBookmarkMediaRefresher _sankaku({
+  Future<PostDto?> Function(String id)? fetchPost,
+}) => SankakuBookmarkMediaRefresher(
+  fetchPost: fetchPost ?? (_) async => null,
+  now: () => _now,
 );
 
 void main() {
@@ -91,18 +113,38 @@ void main() {
     }
   });
 
+  group('Whether a Sankaku bookmark needs fresh media', () {
+    final cases = [
+      (name: 'expired', url: _signed('o/a.jpg', _past), expected: true),
+      (name: 'still valid', url: _signed('o/a.jpg', _future), expected: false),
+      (
+        name: 'unsigned',
+        url: 'https://s.sankakucomplex.com/o/a.jpg',
+        expected: false,
+      ),
+    ];
+
+    for (final c in cases) {
+      test('is ${c.expected} when the stored URLs are ${c.name}', () {
+        expect(
+          _sankaku().needsRefresh(_bookmark(originalUrl: c.url)),
+          c.expected,
+        );
+      });
+    }
+  });
+
   group('Refreshing Sankaku bookmark media', () {
     test('keeps stored URLs without fetching while they are valid', () async {
       var fetched = false;
-      final refresh = sankakuBookmarkMediaRefresher(
+      final refresher = _sankaku(
         fetchPost: (_) async {
           fetched = true;
           return null;
         },
-        now: () => _now,
       );
 
-      final result = await refresh(
+      final result = await refresher.refresh(
         _bookmark(originalUrl: _signed('o/a.jpg', _future)),
       );
 
@@ -112,32 +154,60 @@ void main() {
 
     test('fetches fresh URLs by post id once they expire', () async {
       String? requestedId;
-      final refresh = sankakuBookmarkMediaRefresher(
+      final refresher = _sankaku(
         fetchPost: (id) async {
           requestedId = id;
           return PostDto(
-            previewUrl: 'https://fresh/preview',
-            sampleUrl: 'https://fresh/sample',
-            fileUrl: 'https://fresh/file.jpg',
+            previewUrl: 'https://v.x/preview.avif?e=${_future + 10}',
+            sampleUrl: 'https://v.x/sample.webp?e=$_future',
+            fileUrl: 'https://s.x/file.jpg?e=${_future + 20}',
           );
         },
-        now: () => _now,
       );
 
-      final result = await refresh(
-        _bookmark(originalUrl: _signed('o/a.jpg', _past)),
+      final result = await refresher.refresh(
+        _bookmark(
+          originalUrl: _signed('o/a.jpg', _past),
+          sampleUrl: 'https://v.sankakucomplex.com/s.webp?e=$_past',
+          thumbnailUrl: 'https://v.sankakucomplex.com/p.avif?e=$_past',
+        ),
       );
 
       expect(requestedId, '62946932');
       expect(
         result,
-        const BookmarkMediaUrls(
-          thumbnailUrl: 'https://fresh/preview',
-          sampleUrl: 'https://fresh/sample',
-          originalUrl: 'https://fresh/file.jpg',
-          originalCacheUrl: 'https://s.sankakucomplex.com/o/a.jpg',
+        BookmarkMediaUrls(
+          thumbnailUrl: 'https://v.x/preview.avif?e=${_future + 10}',
+          sampleUrl: 'https://v.x/sample.webp?e=$_future',
+          originalUrl: 'https://s.x/file.jpg?e=${_future + 20}',
+          cacheAliases: const {
+            'https://s.x/file.jpg?e=${_future + 20}':
+                'https://s.sankakucomplex.com/o/a.jpg',
+            'https://v.x/sample.webp?e=$_future':
+                'https://v.sankakucomplex.com/s.webp',
+            'https://v.x/preview.avif?e=${_future + 10}':
+                'https://v.sankakucomplex.com/p.avif',
+          },
+          expiresAt: DateTime.fromMillisecondsSinceEpoch(_future * 1000),
         ),
       );
+    });
+
+    test('stores a shared fresh URL where the larger file goes', () async {
+      final refresher = _sankaku(
+        fetchPost: (_) async => PostDto(fileUrl: 'https://s.x/file.jpg'),
+      );
+
+      final result = await refresher.refresh(
+        _bookmark(
+          originalUrl: _signed('o/a.jpg', _past),
+          thumbnailUrl: 'https://v.sankakucomplex.com/p.avif?e=$_past',
+        ),
+      );
+
+      expect(result?.cacheAliases, {
+        'https://s.x/file.jpg': 'https://s.sankakucomplex.com/o/a.jpg',
+      });
     });
 
     final unusable = [
@@ -158,71 +228,70 @@ void main() {
 
     for (final c in unusable) {
       test('keeps stored URLs when ${c.name}', () async {
-        final refresh = sankakuBookmarkMediaRefresher(
-          fetchPost: (_) async => c.post,
-          now: () => _now,
-        );
+        final refresher = _sankaku(fetchPost: (_) async => c.post);
 
-        expect(await refresh(c.bookmark), isNull);
+        expect(await refresher.refresh(c.bookmark), isNull);
       });
     }
   });
 
-  group('Where a refreshed Sankaku original is cached', () {
-    final cases = [
-      (
-        stored: _signed('o/4f/92/abc.jpg', _past),
-        expected: 'https://s.sankakucomplex.com/o/4f/92/abc.jpg',
-      ),
-      (
-        stored: 'https://s.sankakucomplex.com/o/4f/92/abc.png',
-        expected: 'https://s.sankakucomplex.com/o/4f/92/abc.png',
-      ),
-    ];
-
-    for (final c in cases) {
-      test('uses ${c.expected} for ${c.stored}', () {
-        expect(sankakuOriginalCacheUrl(c.stored), c.expected);
-      });
-    }
-
-    test('differs from a signed stored URL, whose key may hold the '
-        'expired-link placeholder', () {
-      final stored = _signed('o/4f/92/abc.jpg', _past);
-
-      expect(sankakuOriginalCacheUrl(stored), isNot(stored));
+  group('Where refreshed Sankaku media is cached', () {
+    test('uses the stored URL without its signature', () {
+      expect(
+        sankakuStableCacheUrl(_signed('o/4f/92/abc.jpg', _past)),
+        'https://s.sankakucomplex.com/o/4f/92/abc.jpg',
+      );
     });
 
-    test('is the same file bookmark removal clears', () async {
-      final bookmark = _bookmark(originalUrl: _signed('o/a.jpg', _past));
+    test('is what bookmark removal clears', () async {
+      final bookmark = _bookmark(
+        originalUrl: _signed('o/a.jpg', _past),
+        sampleUrl: 'https://v.sankakucomplex.com/s.webp?e=$_past',
+        thumbnailUrl: 'https://v.sankakucomplex.com/p.avif?e=$_past',
+      );
       final container = createContainer();
       final repo = container.read(
         Provider((ref) => SankakuRepository(ref: ref)),
       );
-      final refresh = sankakuBookmarkMediaRefresher(
-        fetchPost: (_) async => PostDto(fileUrl: _signed('o/a.jpg', _future)),
-        now: () => _now,
-      );
-
-      final refreshed = await refresh(bookmark);
+      final refreshed = await _sankaku(
+        fetchPost: (_) async => PostDto(
+          previewUrl: 'https://v.x/p.avif?e=$_future',
+          sampleUrl: 'https://v.x/s.webp?e=$_future',
+          fileUrl: 'https://s.x/f.jpg?e=$_future',
+        ),
+      ).refresh(bookmark);
 
       expect(
-        repo.bookmarkOriginalCacheUrl(bookmark),
-        refreshed?.originalCacheUrl,
+        repo.bookmarkStableCacheUrls(bookmark).toSet(),
+        refreshed?.cacheAliases.values.toSet(),
       );
     });
   });
 
-  group('Aliased bookmark image cache', () {
-    final cache = AliasedImageCacheManager(
-      inner: _KeyEchoCache(),
-      aliases: {'https://fresh/file.jpg': 'https://stored/file.jpg'},
+  test('ordinary images are not taken for the expired-link placeholder', () {
+    expect(
+      isSankakuExpiredPlaceholder(Uint8List.fromList([137, 80, 78, 71])),
+      isFalse,
     );
+  });
 
-    test('stores a refreshed URL under the stored URL key', () {
+  group('Aliased bookmark image cache', () {
+    late _RecordingCache inner;
+    late AliasedImageCacheManager cache;
+
+    setUp(() {
+      inner = _RecordingCache();
+      cache = AliasedImageCacheManager(
+        inner: inner,
+        aliases: {'https://fresh/file.jpg': 'https://stable/file.jpg'},
+        rejectSave: (bytes) => bytes.first == 0,
+      );
+    });
+
+    test('stores a refreshed URL under its stable key', () {
       expect(
         cache.generateCacheKey('https://fresh/file.jpg'),
-        'key:https://stored/file.jpg',
+        'key:https://stable/file.jpg',
       );
     });
 
@@ -231,6 +300,13 @@ void main() {
         cache.generateCacheKey('https://other/file.jpg'),
         'key:https://other/file.jpg',
       );
+    });
+
+    test('never stores rejected bytes', () async {
+      await cache.saveFile('k', Uint8List.fromList([0, 1]));
+      await cache.saveFile('k', Uint8List.fromList([1, 1]));
+
+      expect(inner.saved, ['k:1']);
     });
   });
 
@@ -249,16 +325,451 @@ void main() {
 
       expect(repo.bookmarkMediaRefresher(config), isNull);
       expect(
-        repo.bookmarkOriginalCacheUrl(
+        repo.bookmarkStableCacheUrls(
           _bookmark(originalUrl: 'https://static1.e621.net/data/a.jpg'),
         ),
-        isNull,
+        isEmpty,
       );
     },
   );
+
+  group('Bookmark media state', () {
+    final bookmark = _bookmark(originalUrl: _signed('o/a.jpg', _past));
+
+    ProviderContainer containerWith(_FakeRefresher? refresher) =>
+        createContainer(
+          overrides: [
+            bookmarkMediaRefresherProvider.overrideWith((ref, _) => refresher),
+          ],
+        );
+
+    test('uses stored URLs for engines without a refresher', () {
+      final container = containerWith(null);
+
+      expect(
+        container.read(bookmarkMediaProvider(bookmark)),
+        isA<BookmarkMediaStored>(),
+      );
+    });
+
+    test('uses stored URLs without refreshing while they are valid', () {
+      final refresher = _FakeRefresher(needs: false);
+      final container = containerWith(refresher);
+
+      expect(
+        container.read(bookmarkMediaProvider(bookmark)),
+        isA<BookmarkMediaStored>(),
+      );
+      expect(refresher.calls, 0);
+    });
+
+    test('is refreshing until fresh URLs arrive', () async {
+      final container = containerWith(
+        _FakeRefresher(results: [() async => _urls()]),
+      );
+      container.listen(bookmarkMediaProvider(bookmark), (_, _) {});
+
+      expect(
+        container.read(bookmarkMediaProvider(bookmark)),
+        isA<BookmarkMediaRefreshing>(),
+      );
+      await container.read(bookmarkMediaFetchProvider(bookmark).future);
+      expect(
+        container.read(bookmarkMediaProvider(bookmark)),
+        isA<BookmarkMediaRefreshed>().having((m) => m.urls, 'urls', _urls()),
+      );
+    });
+
+    test('falls back to stored URLs when the first refresh fails', () async {
+      final container = containerWith(
+        _FakeRefresher(results: [() async => throw Exception('offline')]),
+      );
+      container.listen(bookmarkMediaProvider(bookmark), (_, _) {});
+
+      await container.read(bookmarkMediaFetchProvider(bookmark).future);
+
+      expect(
+        container.read(bookmarkMediaProvider(bookmark)),
+        isA<BookmarkMediaStored>(),
+      );
+    });
+  });
+
+  group('Renewing refreshed bookmark media', () {
+    final bookmark = _bookmark(originalUrl: _signed('o/a.jpg', _past));
+    const renewal = BookmarkMediaRenewal(
+      renewMargin: Duration.zero,
+      minRenewDelay: Duration(milliseconds: 500),
+    );
+
+    ProviderContainer containerWith(_FakeRefresher refresher) {
+      final container = createContainer(
+        overrides: [
+          bookmarkMediaRefresherProvider.overrideWith((ref, _) => refresher),
+          bookmarkMediaRenewalProvider.overrideWithValue(renewal),
+        ],
+      );
+      container.listen(bookmarkMediaProvider(bookmark), (_, _) {});
+      return container;
+    }
+
+    DateTime inMs(int ms) => DateTime.now().add(Duration(milliseconds: ms));
+
+    test('refreshes again shortly before the fresh URLs expire', () async {
+      final refresher = _FakeRefresher(
+        results: [
+          () async => _urls(expiresAt: inMs(1000)),
+          () async => _urls(expiresAt: inMs(60000), tag: 'b'),
+        ],
+      );
+      containerWith(refresher);
+
+      await Future<void>.delayed(const Duration(seconds: 2));
+
+      expect(refresher.calls, 2);
+    });
+
+    test('does not loop when fresh URLs are already about to expire', () async {
+      final refresher = _FakeRefresher(
+        results: [() async => _urls(expiresAt: inMs(100))],
+      );
+      containerWith(refresher);
+
+      await Future<void>.delayed(const Duration(seconds: 2));
+
+      expect(refresher.calls, 1);
+    });
+
+    test('keeps showing fresh URLs while renewing them', () async {
+      final renewed = Completer<BookmarkMediaUrls?>();
+      final container = containerWith(
+        _FakeRefresher(
+          results: [
+            () async => _urls(expiresAt: inMs(700)),
+            () => renewed.future,
+          ],
+        ),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 1000));
+
+      expect(
+        container.read(bookmarkMediaProvider(bookmark)),
+        isA<BookmarkMediaRefreshed>().having(
+          (m) => m.urls.originalUrl,
+          'original',
+          _urls().originalUrl,
+        ),
+      );
+      renewed.complete(null);
+    });
+
+    final failures =
+        <({String name, Future<BookmarkMediaUrls?> Function() result})>[
+          (name: 'finds nothing', result: () async => null),
+          (name: 'fails', result: () async => throw Exception('offline')),
+        ];
+
+    for (final f in failures) {
+      test(
+        'keeps the previous URLs and retries when renewal ${f.name}',
+        () async {
+          final refresher = _FakeRefresher(
+            results: [
+              () async => _urls(expiresAt: inMs(700)),
+              f.result,
+              () async => _urls(expiresAt: inMs(60000), tag: 'b'),
+            ],
+          );
+          final container = containerWith(refresher);
+          final seen = <BookmarkMedia>[];
+          container.listen(
+            bookmarkMediaProvider(bookmark),
+            (_, next) => seen.add(next),
+          );
+
+          await Future<void>.delayed(const Duration(milliseconds: 1000));
+
+          expect(
+            container.read(bookmarkMediaProvider(bookmark)),
+            isA<BookmarkMediaRefreshed>().having(
+              (m) => m.urls.originalUrl,
+              'original',
+              _urls().originalUrl,
+            ),
+          );
+          expect(seen.whereType<BookmarkMediaStored>(), isEmpty);
+
+          await Future<void>.delayed(const Duration(milliseconds: 800));
+
+          expect(refresher.calls, 3);
+        },
+      );
+    }
+  });
+
+  group('Renewal across a provider lifetime', () {
+    final bookmark = _bookmark(originalUrl: _signed('o/a.jpg', _past));
+
+    ProviderContainer containerWith(
+      _FakeRefresher refresher,
+      BookmarkMediaRenewal renewal,
+    ) => createContainer(
+      overrides: [
+        bookmarkMediaRefresherProvider.overrideWith((ref, _) => refresher),
+        bookmarkMediaRenewalProvider.overrideWithValue(renewal),
+      ],
+    );
+
+    DateTime inMs(int ms) => DateTime.now().add(Duration(milliseconds: ms));
+    const renewal = BookmarkMediaRenewal(
+      renewMargin: Duration.zero,
+      minRenewDelay: Duration(milliseconds: 200),
+    );
+
+    test(
+      'renewal from a closed screen does not disturb a reopened one',
+      () async {
+        final refresher = _FakeRefresher(
+          results: [
+            () async => _urls(expiresAt: inMs(600)),
+            () async => _urls(expiresAt: inMs(1500), tag: 'b'),
+            () async => _urls(expiresAt: inMs(60000), tag: 'c'),
+          ],
+        );
+        final container = containerWith(refresher, renewal);
+        final sub = container.listen(
+          bookmarkMediaProvider(bookmark),
+          (_, _) {},
+        );
+        await container.read(bookmarkMediaFetchProvider(bookmark).future);
+        sub.close();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        container.listen(bookmarkMediaProvider(bookmark), (_, _) {});
+
+        await Future<void>.delayed(const Duration(milliseconds: 2200));
+
+        expect(
+          container.read(bookmarkMediaProvider(bookmark)),
+          isA<BookmarkMediaRefreshed>().having(
+            (m) => m.urls.originalUrl,
+            'original',
+            _urls(tag: 'c').originalUrl,
+          ),
+        );
+      },
+    );
+
+    test(
+      'a refresh abandoned mid-flight does not stop later renewals',
+      () async {
+        final refresher = _FakeRefresher(
+          results: [
+            () async {
+              await Future<void>.delayed(const Duration(milliseconds: 300));
+              return _urls(expiresAt: inMs(800));
+            },
+            () async => _urls(expiresAt: inMs(1500), tag: 'b'),
+            () async => _urls(expiresAt: inMs(60000), tag: 'c'),
+          ],
+        );
+        final container = containerWith(refresher, renewal);
+        container.listen(bookmarkMediaProvider(bookmark), (_, _) {}).close();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        container.listen(bookmarkMediaProvider(bookmark), (_, _) {});
+
+        await Future<void>.delayed(const Duration(milliseconds: 2200));
+
+        expect(
+          container.read(bookmarkMediaProvider(bookmark)),
+          isA<BookmarkMediaRefreshed>().having(
+            (m) => m.urls.originalUrl,
+            'original',
+            _urls(tag: 'c').originalUrl,
+          ),
+        );
+      },
+    );
+
+    test(
+      'never shows media as refreshing during a scheduled renewal',
+      () async {
+        const margined = BookmarkMediaRenewal(
+          renewMargin: Duration(milliseconds: 400),
+          minRenewDelay: Duration(milliseconds: 200),
+        );
+        final container = containerWith(
+          _FakeRefresher(
+            results: [
+              () async => _urls(expiresAt: inMs(1600)),
+              () async {
+                await Future<void>.delayed(const Duration(milliseconds: 100));
+                return _urls(expiresAt: inMs(60000), tag: 'b');
+              },
+            ],
+          ),
+          margined,
+        );
+        container.listen(bookmarkMediaProvider(bookmark), (_, _) {});
+        await container.read(bookmarkMediaFetchProvider(bookmark).future);
+
+        final shown = <BookmarkMedia>[];
+        for (var i = 0; i < 36; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          shown.add(
+            bookmarkMediaForDisplay(
+              container.read(bookmarkMediaProvider(bookmark)),
+              now: DateTime.now(),
+              renewal: margined,
+              isFetching: container
+                  .read(bookmarkMediaFetchProvider(bookmark))
+                  .isLoading,
+            ).media,
+          );
+        }
+
+        expect(shown.whereType<BookmarkMediaRefreshing>(), isEmpty);
+        expect(
+          shown.last,
+          isA<BookmarkMediaRefreshed>().having(
+            (m) => m.urls.originalUrl,
+            'original',
+            _urls(tag: 'b').originalUrl,
+          ),
+        );
+      },
+    );
+  });
+
+  group('Showing refreshed bookmark media', () {
+    const renewal = BookmarkMediaRenewal();
+    final fetchedAt = _now.subtract(const Duration(hours: 2));
+
+    final cases = [
+      (
+        name: 'URLs that are still valid',
+        expiresAt: _now.add(const Duration(minutes: 30)),
+        isFetching: false,
+        refreshing: false,
+        refetch: false,
+      ),
+      (
+        name: 'URLs that expired while held',
+        expiresAt: _now.subtract(const Duration(minutes: 1)),
+        isFetching: false,
+        refreshing: true,
+        refetch: true,
+      ),
+      (
+        name: 'expired URLs already being renewed',
+        expiresAt: _now.subtract(const Duration(minutes: 1)),
+        isFetching: true,
+        refreshing: true,
+        refetch: false,
+      ),
+    ];
+
+    for (final c in cases) {
+      test('treats ${c.name} as refreshing: ${c.refreshing}', () {
+        final result = bookmarkMediaForDisplay(
+          BookmarkMediaRefreshed(
+            _urls(expiresAt: c.expiresAt),
+            fetchedAt: fetchedAt,
+          ),
+          now: _now,
+          renewal: renewal,
+          isFetching: c.isFetching,
+        );
+
+        expect(result.media is BookmarkMediaRefreshing, c.refreshing);
+        expect(result.refetch, c.refetch);
+      });
+    }
+
+    test('waits before refetching URLs it only just received', () {
+      final result = bookmarkMediaForDisplay(
+        BookmarkMediaRefreshed(
+          _urls(expiresAt: _now.subtract(const Duration(minutes: 1))),
+          fetchedAt: _now,
+        ),
+        now: _now,
+        renewal: renewal,
+        isFetching: false,
+      );
+
+      expect(result.refetch, isFalse);
+    });
+  });
+
+  group('What a bookmark tile shows', () {
+    final image = _bookmark(
+      originalUrl: _signed('o/a.jpg', _past),
+      sampleUrl: 'https://v.sankakucomplex.com/s.webp?e=$_past',
+    ).toPost();
+    final video = _bookmark(
+      originalUrl: _signed('o/v.mp4', _past),
+      thumbnailUrl: 'https://v.sankakucomplex.com/p.avif?e=$_past',
+      format: '.mp4',
+    ).toPost();
+    final refreshed = BookmarkMediaRefreshed(_urls(), fetchedAt: _now);
+
+    test('requests nothing while refreshing', () {
+      final media = bookmarkTileMedia(const BookmarkMediaRefreshing(), image);
+
+      expect(media.imageUrl, '');
+      expect(media.cacheAliases, isNull);
+    });
+
+    test('uses the stored sample for images', () {
+      expect(
+        bookmarkTileMedia(const BookmarkMediaStored(), image).imageUrl,
+        image.sampleImageUrl,
+      );
+    });
+
+    final freshCases = [
+      (name: 'image', post: image, url: _urls().sampleUrl),
+      (name: 'video', post: video, url: _urls().thumbnailUrl),
+    ];
+
+    for (final c in freshCases) {
+      test('shows the fresh URL with its cache aliases for an ${c.name}', () {
+        final media = bookmarkTileMedia(refreshed, c.post);
+
+        expect(media.imageUrl, c.url);
+        expect(media.initialThumbnailUrl, c.url);
+        expect(media.cacheAliases, _urls().cacheAliases);
+      });
+    }
+  });
 }
 
-class _KeyEchoCache implements ImageCacheManager {
+class _FakeRefresher implements BookmarkMediaRefresher {
+  _FakeRefresher({
+    this.needs = true,
+    List<Future<BookmarkMediaUrls?> Function()>? results,
+  }) : _results = results ?? [];
+
+  final bool needs;
+  final List<Future<BookmarkMediaUrls?> Function()> _results;
+  var calls = 0;
+
+  @override
+  bool needsRefresh(Bookmark bookmark) => needs;
+
+  @override
+  Future<BookmarkMediaUrls?> refresh(Bookmark bookmark) {
+    final index = calls++;
+    return index < _results.length ? _results[index]() : Future.value();
+  }
+
+  @override
+  bool isExpiredPlaceholder(Uint8List bytes) => false;
+}
+
+class _RecordingCache implements ImageCacheManager {
+  final saved = <String>[];
+
   @override
   String generateCacheKey(String url, {String? customKey}) =>
       customKey ?? 'key:$url';
@@ -271,7 +782,8 @@ class _KeyEchoCache implements ImageCacheManager {
       null;
 
   @override
-  Future<void> saveFile(String key, Uint8List bytes) async {}
+  Future<void> saveFile(String key, Uint8List bytes) async =>
+      saved.add('$key:${bytes.first}');
 
   @override
   FutureOr<bool> hasValidCache(String key, {Duration? maxAge}) => false;

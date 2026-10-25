@@ -143,8 +143,8 @@ abstract class BooruRepositoryDefault implements BooruRepository {
   }
 
   @override
-  String? bookmarkOriginalCacheUrl(Bookmark bookmark) {
-    return null;
+  Iterable<String> bookmarkStableCacheUrls(Bookmark bookmark) {
+    return const [];
   }
 
   @override
