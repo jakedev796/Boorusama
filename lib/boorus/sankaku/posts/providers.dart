@@ -28,11 +28,12 @@ final sankakuPostRepoProvider =
           tagComposer: tagComposer,
           getSettings: () async => ref.read(imageListingSettingsProvider),
           fetchSingle: (id, {options}) async {
-            final stringId = id as StringPostId?;
+            final postId = switch (id) {
+              StringPostId(:final value) => value,
+              NumericPostId(:final value) => '$value',
+            };
 
-            if (stringId == null) return Future.value();
-
-            final post = await client.getPost(id: stringId.value);
+            final post = await client.getPost(id: postId);
 
             if (post == null) return null;
 
