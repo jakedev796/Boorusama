@@ -95,10 +95,7 @@ class SankakuClient {
   }) async {
     final response = await _dio.post(
       '/auth/token',
-      data: {
-        'login': username,
-        'password': password,
-      },
+      data: {'login': username, 'password': password},
     );
 
     final data = response.data;
@@ -114,6 +111,7 @@ class SankakuClient {
     List<String>? tags,
     int? page = 1,
     int? limit = 60,
+    bool hidePostsInBooks = false,
   }) async {
     final token = await _getToken();
 
@@ -124,6 +122,7 @@ class SankakuClient {
         'page': page,
         'limit': limit,
         if (tags != null && tags.isNotEmpty) 'tags': tags.join(' '),
+        if (hidePostsInBooks) 'hide_posts_in_books': 'always',
       },
       options: Options(
         headers: {
@@ -140,9 +139,7 @@ class SankakuClient {
     return (data as List).map((e) => PostDto.fromJson(e)).toList();
   }
 
-  Future<PostDto?> getPost({
-    required String id,
-  }) async {
+  Future<PostDto?> getPost({required String id}) async {
     final token = await _getToken();
 
     final response = await _dio.get(
@@ -162,9 +159,7 @@ class SankakuClient {
     return PostDto.fromJson(data);
   }
 
-  Future<bool> addToFavorites({
-    required SankakuId postId,
-  }) async {
+  Future<bool> addToFavorites({required SankakuId postId}) async {
     final token = await _getToken();
 
     if (token == null) return false;
@@ -181,9 +176,7 @@ class SankakuClient {
     }
   }
 
-  Future<bool> removeFromFavorites({
-    required SankakuId postId,
-  }) async {
+  Future<bool> removeFromFavorites({required SankakuId postId}) async {
     final token = await _getToken();
 
     if (token == null) return false;
@@ -203,23 +196,15 @@ class SankakuClient {
   // Only a single global autocomplete request per client is allowed for now
   CancelToken? _autocompleteCancelToken;
 
-  Future<List<TagDto>> getAutocomplete({
-    required String query,
-  }) async {
+  Future<List<TagDto>> getAutocomplete({required String query}) async {
     _autocompleteCancelToken?.cancel('Cancelled due to new request being made');
     _autocompleteCancelToken = CancelToken();
 
     try {
       final response = await _dio.get(
         '/tags/autosuggestCreating',
-        queryParameters: {
-          'lang': 'english',
-          'tag': query,
-          'show_meta': 1,
-        },
-        options: Options(
-          receiveTimeout: Duration(seconds: 15),
-        ),
+        queryParameters: {'lang': 'english', 'tag': query, 'show_meta': 1},
+        options: Options(receiveTimeout: Duration(seconds: 15)),
         cancelToken: _autocompleteCancelToken,
       );
 
@@ -235,18 +220,12 @@ class SankakuClient {
     }
   }
 
-  Future<List<TagDto>> getTags({
-    required String query,
-  }) async {
+  Future<List<TagDto>> getTags({required String query}) async {
     try {
       final response = await _dio.get(
         '/tags',
-        queryParameters: {
-          'name': query,
-        },
-        options: Options(
-          receiveTimeout: Duration(seconds: 15),
-        ),
+        queryParameters: {'name': query},
+        options: Options(receiveTimeout: Duration(seconds: 15)),
       );
 
       return (response.data as List).map((e) => TagDto.fromJson(e)).toList();
@@ -263,10 +242,7 @@ class SankakuClient {
     var token = await _authStore.getToken();
 
     if (token == null && username != null && password != null) {
-      token = await login(
-        username: username!,
-        password: password!,
-      );
+      token = await login(username: username!, password: password!);
     }
 
     return token;
