@@ -1,3 +1,11 @@
+# 4.8.2
+- [Sankaku] Book pages no longer fill the post feed
+- [Sankaku] Fix favorites failing with "account is private"
+- [Sankaku] Suggest metatags on the search page
+- [Sankaku] Add Explore, with popular and top-rated posts by day, week or month
+- [Sankaku] Fix opening posts from bookmarks
+- [Sankaku] Bookmark images and thumbnails reload after their links expire
+
 # 4.8.1
 - [Pixiv] The Explore header now scrolls away and returns when you scroll back up
 - [Pixiv] The daily ranking date can no longer be set to today, which showed yesterday's chart
