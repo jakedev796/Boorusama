@@ -145,6 +145,12 @@ class SankakuPost extends Equatable
   final PostStatus? status;
 }
 
+/// Book pages flood regular listings, so they stay hidden unless the query is
+/// browsing a book or the user's own favorites.
+bool shouldHidePostsInBooks(Iterable<String> tags) => !tags.any(
+  (tag) => tag.startsWith('pool:') || tag.startsWith('fav:'),
+);
+
 class SankakuPostLinkGenerator implements PostLinkGenerator<SankakuPost> {
   SankakuPostLinkGenerator({
     required this.baseUrl,

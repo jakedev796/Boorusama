@@ -49,6 +49,7 @@ final sankakuPostRepoProvider =
               tags: tags,
               page: page,
               limit: limit,
+              hidePostsInBooks: shouldHidePostsInBooks(tags),
             );
 
             final data = posts

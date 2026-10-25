@@ -68,11 +68,13 @@ class SankakuIdolClient implements SankakuClient {
   String get originalUrl => _baseUrl;
   bool get isAuthenticated => _token.isNotEmpty;
 
+  // Idol has no books, so there is nothing to hide.
   @override
   Future<List<PostDto>> getPosts({
     List<String>? tags,
     int? page = 1,
     int? limit,
+    bool hidePostsInBooks = false,
   }) async {
     final idolPosts = await getIdolPosts(tags: tags, page: page, limit: limit);
     return idolPosts.map((e) => e.toSankakuPost()).toList();
