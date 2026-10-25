@@ -5,6 +5,7 @@ import 'package:rich_text_controller/rich_text_controller.dart';
 
 // Project imports:
 import '../../../blacklists/types.dart';
+import '../../../bookmarks/types.dart';
 import '../../../comments/types.dart';
 import '../../../configs/config/types.dart';
 import '../../../configs/create/create.dart';
@@ -47,6 +48,8 @@ abstract class BooruRepository {
   TextMatcher? queryMatcher(BooruConfigAuth config);
   TagExtractor tagExtractor(BooruConfigAuth config);
   MetatagExtractor? getMetatagExtractor(BooruConfigAuth config);
+  BookmarkMediaRefresher? bookmarkMediaRefresher(BooruConfigAuth config);
+  String? bookmarkOriginalCacheUrl(Bookmark bookmark);
   CommentRepository comment(BooruConfigAuth config);
   TextMarkupRepository? textMarkup(BooruConfigAuth config);
   Dio dio(BooruConfigAuth config);

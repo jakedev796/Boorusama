@@ -4,6 +4,7 @@ import 'package:coreutils/coreutils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Project imports:
+import '../../core/bookmarks/types.dart';
 import '../../core/boorus/defaults/types.dart';
 import '../../core/configs/config/types.dart';
 import '../../core/configs/create/create.dart';
@@ -13,6 +14,8 @@ import '../../core/posts/post/types.dart';
 import '../../core/tags/autocompletes/types.dart';
 import '../../core/tags/metatag/types.dart';
 import '../../core/tags/tag/types.dart';
+import 'bookmarks/types.dart';
+import 'client_provider.dart';
 import 'posts/providers.dart';
 import 'posts/types.dart';
 import 'tags/metatags.dart';
@@ -81,6 +84,19 @@ class SankakuRepository extends BooruRepositoryDefault {
       ],
     );
   }
+
+  @override
+  BookmarkMediaRefresher? bookmarkMediaRefresher(BooruConfigAuth config) {
+    final client = ref.read(sankakuClientProvider(config));
+
+    return sankakuBookmarkMediaRefresher(
+      fetchPost: (id) => client.getPost(id: id),
+    );
+  }
+
+  @override
+  String? bookmarkOriginalCacheUrl(Bookmark bookmark) =>
+      sankakuOriginalCacheUrl(bookmark.originalUrl);
 
   @override
   MetatagExtractor? getMetatagExtractor(BooruConfigAuth config) {

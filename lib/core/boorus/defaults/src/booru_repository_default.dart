@@ -7,6 +7,7 @@ import 'package:rich_text_controller/rich_text_controller.dart';
 import '../../../../foundation/url_launcher.dart';
 import '../../../blacklists/providers.dart';
 import '../../../blacklists/types.dart';
+import '../../../bookmarks/types.dart';
 import '../../../comments/providers.dart';
 import '../../../comments/types.dart';
 import '../../../configs/config/providers.dart';
@@ -133,6 +134,16 @@ abstract class BooruRepositoryDefault implements BooruRepository {
 
   @override
   MetatagExtractor? getMetatagExtractor(BooruConfigAuth config) {
+    return null;
+  }
+
+  @override
+  BookmarkMediaRefresher? bookmarkMediaRefresher(BooruConfigAuth config) {
+    return null;
+  }
+
+  @override
+  String? bookmarkOriginalCacheUrl(Bookmark bookmark) {
     return null;
   }
 

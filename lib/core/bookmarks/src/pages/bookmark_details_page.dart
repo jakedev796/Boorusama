@@ -19,8 +19,10 @@ import '../../../posts/shares/widgets.dart';
 import '../../../posts/sources/types.dart';
 import '../../../widgets/adaptive_button_row.dart';
 import '../../../widgets/booru_menu_button_row.dart';
+import '../data/aliased_image_cache.dart';
 import '../data/bookmark_convert.dart';
 import '../data/providers.dart';
+import '../providers/bookmark_media_provider.dart';
 import '../providers/bookmark_provider.dart';
 import '../widgets/bookmark_tag_tiles.dart';
 
@@ -140,6 +142,18 @@ class _BookmarkDetailsPageState
             post.bookmark.sourceUrl,
           )),
         );
+        // Only the displayed media follows refreshed URLs; the post itself
+        // keeps its stored URLs because bookmark identity is derived from them.
+        final freshMedia = ref
+            .watch(bookmarkMediaUrlsProvider(post.bookmark))
+            .valueOrNull;
+        final itemCacheManager = switch ((freshMedia, imageCacheManager)) {
+          (final fresh?, final cache?) => AliasedImageCacheManager(
+            inner: cache,
+            aliases: {fresh.originalUrl: fresh.originalCacheUrl},
+          ),
+          _ => imageCacheManager,
+        };
 
         return PostDetailsItem(
           index: index,
@@ -149,9 +163,10 @@ class _BookmarkDetailsPageState
           authConfig: config?.auth ?? auth,
           viewerConfig: config?.viewer ?? viewer,
           gestureConfig: gestures,
-          imageCacheManager: imageCacheManager,
+          imageCacheManager: itemCacheManager,
           detailsController: controller,
-          imageUrlBuilder: (post) => post.originalImageUrl,
+          imageUrlBuilder: (post) =>
+              freshMedia?.originalUrl ?? post.originalImageUrl,
           mediaAspectRatioBuilder: (post) => post.effectiveOriginalAspectRatio,
           videoAspectRatioBuilder: (post) => post.effectiveVideoAspectRatio,
         );

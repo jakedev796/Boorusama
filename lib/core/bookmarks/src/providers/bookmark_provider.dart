@@ -171,6 +171,18 @@ class BookmarkNotifier extends AsyncNotifier<BookmarkState> {
     );
   }
 
+  // Includes where an engine stores media refreshed after the stored URLs
+  // expired, so removing a bookmark leaves none of its files behind.
+  List<String> _cachedUrlsOf(Bookmark bookmark) => [
+    bookmark.originalUrl,
+    bookmark.sampleUrl,
+    bookmark.thumbnailUrl,
+    ?ref
+        .read(booruEngineRegistryProvider)
+        .getRepository(intToBooruType(bookmark.booruId))
+        ?.bookmarkOriginalCacheUrl(bookmark),
+  ];
+
   Future<void> removeBookmark(
     Bookmark bookmark, {
     void Function()? onSuccess,
@@ -181,15 +193,8 @@ class BookmarkNotifier extends AsyncNotifier<BookmarkState> {
       if (_cacheManager case final cache?) {
         // Clear all image variants
         await Future.wait([
-          cache.clearCache(
-            cache.generateCacheKey(bookmark.originalUrl),
-          ),
-          cache.clearCache(
-            cache.generateCacheKey(bookmark.sampleUrl),
-          ),
-          cache.clearCache(
-            cache.generateCacheKey(bookmark.thumbnailUrl),
-          ),
+          for (final url in _cachedUrlsOf(bookmark))
+            cache.clearCache(cache.generateCacheKey(url)),
         ]);
       }
       onSuccess?.call();
@@ -216,15 +221,8 @@ class BookmarkNotifier extends AsyncNotifier<BookmarkState> {
         await Future.wait(
           bookmarks.expand(
             (b) => [
-              cache.clearCache(
-                cache.generateCacheKey(b.originalUrl),
-              ),
-              cache.clearCache(
-                cache.generateCacheKey(b.sampleUrl),
-              ),
-              cache.clearCache(
-                cache.generateCacheKey(b.thumbnailUrl),
-              ),
+              for (final url in _cachedUrlsOf(b))
+                cache.clearCache(cache.generateCacheKey(url)),
             ],
           ),
         );
