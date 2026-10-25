@@ -15,6 +15,7 @@ import 'favorites/widgets.dart';
 import 'home/widgets.dart';
 import 'posts/types.dart';
 import 'posts/widgets.dart';
+import 'search/widgets.dart';
 
 class SankakuBuilder extends BaseBooruBuilder {
   SankakuBuilder();
@@ -55,6 +56,12 @@ class SankakuBuilder extends BaseBooruBuilder {
   @override
   HomePageBuilder get homePageBuilder =>
       (context) => const SankakuHomePage();
+
+  @override
+  SearchPageBuilder get searchPageBuilder =>
+      (context, params) => SankakuSearchPage(
+        params: params,
+      );
 
   @override
   PostDetailsPageBuilder get postDetailsPageBuilder => (context, payload) {
