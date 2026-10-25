@@ -69,5 +69,17 @@ void main() {
       );
     }
 
+    test('resolves the account name when logging in by email', () async {
+      final client = createClient(
+        username: 'someone@example.com',
+        password: 'secret',
+      );
+
+      expect(await client.getCurrentUsername(), 'account_name');
+    });
+
+    test('has no account name without credentials', () async {
+      expect(await createClient().getCurrentUsername(), isNull);
+    });
   });
 }
